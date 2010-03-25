@@ -12,6 +12,8 @@ namespace SocketServers
 		: EventArgs
 		, IBuffersPoolItem
 	{
+		public const int DefaultUserToken1 = -1;
+
 		private SocketAsyncEventArgs socketArgs;
 
 		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
@@ -25,14 +27,23 @@ namespace SocketServers
 			};
 
 			socketArgs.Completed += SocketArgs_Completed;
+
+			UserToken1 = DefaultUserToken1;
 		}
 
 		void IBuffersPoolItem.Reset()
 		{
+			UserToken1 = DefaultUserToken1;
 			Completed = null;
 		}
 
 		public ServerEndPoint LocalEndPoint
+		{
+			get;
+			set;
+		}
+
+		public int UserToken1
 		{
 			get;
 			set;
@@ -43,6 +54,11 @@ namespace SocketServers
 		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
 		{
 			return serverArgs.socketArgs;
+		}
+
+		public int Offset
+		{
+			get { return socketArgs.Offset; }
 		}
 
 		public int BytesTransferred 

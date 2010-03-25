@@ -90,7 +90,7 @@ namespace SocketServers
 			}
 		}
 
-		public override void SendAsync(ServerAsyncEventArgs e)
+		public override void SendAsync(ServerAsyncEventArgs e, bool connect)
 		{
 			Socket socket = null;
 
@@ -107,13 +107,22 @@ namespace SocketServers
 
 			if (socket == null)
 			{
-				socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-				socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
-				socket.Bind(realEndPoint);
+				if (connect)
+				{
+					socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
+					socket.Bind(realEndPoint);
 
-				e.Completed = Connect_Completed;
-				if (socket.ConnectAsync(e) == false)
+					e.Completed = Connect_Completed;
+					if (socket.ConnectAsync(e) == false)
+						e.OnCompleted(socket);
+				}
+				else
+				{
+					e.Completed = Send_Completed;
+					e.SocketError = SocketError.NotConnected;
 					e.OnCompleted(socket);
+				}
 			}
 			else
 			{

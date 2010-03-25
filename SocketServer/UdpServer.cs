@@ -49,7 +49,7 @@ namespace SocketServers
 			}
 		}
 
-		public override void SendAsync(ServerAsyncEventArgs e)
+		public override void SendAsync(ServerAsyncEventArgs e, bool connect)
 		{
 			e.Completed = Send_Completed;
 

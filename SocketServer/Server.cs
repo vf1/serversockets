@@ -29,7 +29,7 @@ namespace SocketServers
 
 		public abstract void Start();
 		public abstract void Stop();
-		public abstract void SendAsync(ServerAsyncEventArgs e);
+		public abstract void SendAsync(ServerAsyncEventArgs e, bool connect);
 
 		public ServerEndPoint LocalEndPoint
 		{
