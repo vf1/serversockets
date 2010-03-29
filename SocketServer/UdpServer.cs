@@ -14,11 +14,14 @@ namespace SocketServers
 	{
 		private object sync;
 		private Socket socket;
+		private int queueSize;
 
-		public UdpServer()
+		public UdpServer(ServersManagerConfig config)
 			: base()
 		{
 			sync = new object();
+
+			queueSize = (config.UdpQueueSize > 0) ? config.UdpQueueSize : 16;
 		}
 
 		public override void Start()
@@ -30,7 +33,7 @@ namespace SocketServers
 				socket = new Socket(realEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 				socket.Bind(realEndPoint);
 
-				ThreadPool.QueueUserWorkItem(new WaitCallback(EnqueueBuffers), 16);
+				ThreadPool.QueueUserWorkItem(new WaitCallback(EnqueueBuffers), queueSize);
 			}
 		}
 
@@ -42,8 +45,7 @@ namespace SocketServers
 			{
 				if (socket != null)
 				{
-					socket.Shutdown(SocketShutdown.Both);
-					socket.Close();
+					socket.SafeShutdownClose();
 					socket = null;
 				}
 			}
@@ -52,7 +54,6 @@ namespace SocketServers
 		public override void SendAsync(ServerAsyncEventArgs e, bool connect)
 		{
 			e.Completed = Send_Completed;
-
 			if (socket.SendToAsync(e) == false)
 				e.OnCompleted(socket);
 		}

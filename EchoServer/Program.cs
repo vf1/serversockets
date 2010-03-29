@@ -17,15 +17,16 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager(
-				(ServerEndPoint real) => { return new IPEndPoint(address, port++); }, 256);
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = 5070, InitialBufferSize = 128, });
+			var serversManager = new ServersManager(256, new ServersManagerConfig() { TcpInitialBufferSize = 128, TcpInitialOffset = 256, });
+			serversManager.FakeAddressAction = (ServerEndPoint real) => { return new IPEndPoint(address, port++); };
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = 5070, });
 			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Udp, Port = 5070, });
 			serversManager.ServerAdded += ServersManager_ServerAdded;
 			serversManager.ServerRemoved += ServersManager_ServerRemoved;
 			serversManager.ServerInfo += ServersManager_ServerInfo;
 			serversManager.Received += ServersManager_Received;
 			serversManager.Sent += ServersManager_Sent;
+			serversManager.NewConnection += ServersManager_NewConnection;
 
 			Console.WriteLine(@"Ok");
 
@@ -76,6 +77,7 @@ namespace EchoServer
 			serversManager.ServerRemoved -= ServersManager_ServerRemoved;
 			serversManager.Received -= ServersManager_Received;
 			serversManager.Sent -= ServersManager_Sent;
+			serversManager.NewConnection -= ServersManager_NewConnection;
 
 			/////////////////////////////////////////////////////////////////////////
 
@@ -92,7 +94,7 @@ namespace EchoServer
 		{
 			if (e.LocalEndPoint.Protocol == ServerIpProtocol.Udp)
 			{
-				e.SetBuffer(e.BytesUsed);
+				e.SetBuffer(e.Offset, e.BytesTransferred);
 				server.SendAsync(e);
 				e = null;
 			}
@@ -100,13 +102,13 @@ namespace EchoServer
 			{
 				if (e.ContinueBuffer() == false)
 				{
-					if (e.BytesUsed < 3072)
+					if (e.BytesTransferred < 3072)
 					{
 						e.ContinueBuffer(3072);
 					}
 					else
 					{
-						e.SetBuffer(e.BytesUsed);
+						e.SetBuffer(e.Offset, e.BytesTransferred);
 						server.SendAsync(e);
 						e = null;
 					}
@@ -133,6 +135,11 @@ namespace EchoServer
 		static void ServersManager_ServerInfo(object sender, ServerInfoEventArgs e)
 		{
 			Console.WriteLine(@"  -    Info: [ {0} ] {1}", e.ServerEndPoint.ToString(), e.ToString());
+		}
+
+		static void ServersManager_NewConnection(ServersManager s, ServerConnectionEventArgs e)
+		{
+			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.ServerEndPoint.ToString(), e.ConnectionId);
 		}
 	}
 }

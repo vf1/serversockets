@@ -17,11 +17,17 @@ namespace SocketServers
 		private Socket listener;
 		private SocketAsyncEventArgs[] acceptEventArgs;
 		private SafeDictionary<EndPoint, Socket> connections;
+		private static int connectionCount;
+		private int initialBufferSize;
+		private int initialOffset;
 
-		public TcpServer()
+		public TcpServer(ServersManagerConfig config)
 			: base()
 		{
 			sync = new object();
+
+			initialBufferSize = config.TcpInitialBufferSize;
+			initialOffset = config.TcpInitialOffset;
 		}
 
 		public override void Start()
@@ -64,29 +70,12 @@ namespace SocketServers
 			{
 				if (listener != null)
 				{
-					connections.ForEach((socket) => { Close(socket); });
+					connections.ForEach((socket) => { socket.SafeShutdownClose(); });
 					connections.Clear();
 
 					listener.Close();
 					listener = null;
 				}
-			}
-		}
-
-		private void Close(Socket socket)
-		{
-			try
-			{
-				try
-				{
-					socket.Shutdown(SocketShutdown.Both);
-				}
-				catch { }
-				
-				socket.Close();
-			}
-			catch (ObjectDisposedException)
-			{
 			}
 		}
 
@@ -98,7 +87,7 @@ namespace SocketServers
 			{
 				if (socket.Connected == false)
 				{
-					Close(socket);
+					socket.SafeShutdownClose();
 					socket = null;
 
 					connections.Remove(e.RemoteEndPoint);
@@ -113,9 +102,7 @@ namespace SocketServers
 					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
 					socket.Bind(realEndPoint);
 
-					e.Completed = Connect_Completed;
-					if (socket.ConnectAsync(e) == false)
-						e.OnCompleted(socket);
+					socket.ConnectAsync(e, Connect_Completed);
 				}
 				else
 				{
@@ -126,17 +113,18 @@ namespace SocketServers
 			}
 			else
 			{
-				e.Completed = Send_Completed;
-				if (socket.SendAsync(e) == false)
-					e.OnCompleted(socket);
+				socket.SendAsync(e, Send_Completed);
 			}
 		}
 
 		private void Connect_Completed(Socket socket, ServerAsyncEventArgs e)
 		{
+			bool beginReceive = false;
+
 			if (e.SocketError == SocketError.Success)
 			{
 				connections.Add(e.RemoteEndPoint, socket);
+				beginReceive = true;
 			}
 			else
 			{
@@ -145,21 +133,33 @@ namespace SocketServers
 					if (connections.TryGetValue(e.RemoteEndPoint, out socket))
 						break;
 
-					Thread.Sleep(25);
+					Thread.Sleep(0);
 
 					if (socket.ConnectAsync(e))
 						return;
+					else
+					{
+						if (e.SocketError == SocketError.Success)
+						{
+							connections.Add(e.RemoteEndPoint, socket);
+							beginReceive = true;
+						}
+					}
 				}
 			}
 
-			if (socket.Connected)
+			// send message or report connection error
+			//
+			if (e.SocketError == SocketError.Success)
 			{
-				e.Completed = Send_Completed;
-				if (socket.SendAsync(e) == false)
-					e.OnCompleted(socket);
+				socket.SendAsync(e, Send_Completed);
+
+				if (beginReceive)
+					BeginReceive(socket);
 			}
 			else
 			{
+				e.Completed = Send_Completed;
 				e.OnCompleted(socket);
 			}
 		}
@@ -168,7 +168,7 @@ namespace SocketServers
 		{
 			if (isRunning == false)
 			{
-				Close(acceptEventArgs.AcceptSocket);
+				acceptEventArgs.AcceptSocket.SafeShutdownClose();
 			}
 			else
 			{
@@ -188,8 +188,12 @@ namespace SocketServers
 
 		private void BeginReceive(Socket socket)
 		{
+			int connectionId = Interlocked.Increment(ref connectionCount);
+
 			var e = buffersPool.Get();
-			PrepareBuffer(e, socket.RemoteEndPoint);
+			PrepareBuffer(e, socket.RemoteEndPoint, connectionId);
+
+			OnNewConnection(socket.RemoteEndPoint, connectionId);
 
 			if (socket.ReceiveAsync(e) == false)
 				e.OnCompleted(socket);
@@ -202,8 +206,9 @@ namespace SocketServers
 				do
 				{
 					bool close = true;
+					int connectionId = e.ConnectionId;
 
-					if (socket.Connected && e.BytesTransferred > 0 &&
+					if (socket.Connected && ((SocketAsyncEventArgs)e).BytesTransferred > 0 &&
 						e.SocketError == SocketError.Success)
 					{
 						close = !OnReceived(ref e);
@@ -215,14 +220,14 @@ namespace SocketServers
 							buffersPool.Put(ref e);
 
 						connections.Remove(socket.RemoteEndPoint);
-						Close(socket);
+						socket.SafeShutdownClose();
 						break;
 					}
 
 					if (e == null)
 					{
 						e = buffersPool.Get();
-						PrepareBuffer(e, socket.RemoteEndPoint);
+						PrepareBuffer(e, socket.RemoteEndPoint, connectionId);
 					}
 				}
 				while (socket.ReceiveAsync(e) == false);
@@ -237,11 +242,15 @@ namespace SocketServers
 			}
 		}
 
-		private void PrepareBuffer(ServerAsyncEventArgs e, EndPoint remote)
+		private void PrepareBuffer(ServerAsyncEventArgs e, EndPoint remote, int connectionId)
 		{
-			e.Completed = Receive_Completed;
+			e.ConnectionId = connectionId;
 			e.RemoteEndPoint = remote as IPEndPoint;
-			e.SetBuffer(initialBufferSize);
+			e.Completed = Receive_Completed;
+			if (initialBufferSize > 0)
+				e.SetBuffer(initialOffset, initialBufferSize);
+			else
+				e.SetBuffer(initialOffset);
 		}
 	}
 }

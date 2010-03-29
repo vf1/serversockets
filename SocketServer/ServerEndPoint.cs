@@ -31,6 +31,11 @@ namespace SocketServers
 
 		public ServerIpProtocol Protocol { get; set; }
 
+		public ProtocolPort ProtocolPort
+		{
+			get { return new ProtocolPort(Protocol, Port); }
+		}
+
 		public bool IsEqual(ServerEndPoint p)
 		{
 			return AddressFamily == p.AddressFamily && Port == p.Port &&

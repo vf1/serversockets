@@ -19,45 +19,31 @@ namespace SocketServers
 		private SafeDictionary<ServerEndPoint, Server> fakeServers;
 		private List<ProtocolPort> protocolPorts;
 		private BuffersPool<ServerAsyncEventArgs> buffersPool;
-		private Func<NetworkInterface, IPInterfaceProperties, UnicastIPAddressInformation, bool> addressPredicate;
-		private Func<ServerEndPoint, IPEndPoint> fakeAddressAction;
 		private List<UnicastIPAddressInformation> networkAddressInfos;
-		private int minPort;
-		private int maxPort;
+		private ServersManagerConfig config;
 		private int nextPort;
 
-		public ServersManager(int buffersPoolSize)
-			: this(DefaultAddressPredicate, buffersPoolSize)
+		public ServersManager(int buffersPoolSize, ServersManagerConfig config)
+			: this(new BuffersPool<ServerAsyncEventArgs>(buffersPoolSize), config)
 		{
 		}
 
-		public ServersManager(Func<ServerEndPoint, IPEndPoint> fakeAddressAction, int buffersPoolSize)
-			: this(DefaultAddressPredicate, fakeAddressAction, buffersPoolSize)
+		public ServersManager(BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
 		{
-		}
-
-		public ServersManager(Func<NetworkInterface, IPInterfaceProperties, UnicastIPAddressInformation, bool> addressPredicate, int buffersPoolSize)
-			: this(addressPredicate, DefaultFakeAddressAction, new BuffersPool<ServerAsyncEventArgs>(buffersPoolSize), -1, -1)
-		{
-		}
-
-		public ServersManager(Func<NetworkInterface, IPInterfaceProperties, UnicastIPAddressInformation, bool> addressPredicate, Func<ServerEndPoint, IPEndPoint> fakeAddressAction, int buffersPoolSize)
-			: this(addressPredicate, fakeAddressAction, new BuffersPool<ServerAsyncEventArgs>(buffersPoolSize), -1, -1)
-		{
-		}
-
-		public ServersManager(Func<NetworkInterface, IPInterfaceProperties, UnicastIPAddressInformation, bool> addressPredicate, Func<ServerEndPoint, IPEndPoint> fakeAddressAction, BuffersPool<ServerAsyncEventArgs> buffersPool, int minPort, int maxPort)
-		{
-			this.sync = new object();
 			this.running = false;
-			this.buffersPool = buffersPool;
-			this.addressPredicate = addressPredicate;
-			this.fakeAddressAction = fakeAddressAction;
+
+			this.sync = new object();
 			this.protocolPorts = new List<ProtocolPort>();
 			this.servers = new SafeDictionary<ServerEndPoint, Server>();
 			this.fakeServers = new SafeDictionary<ServerEndPoint, Server>();
-			this.minPort = this.nextPort = minPort;
-			this.maxPort = maxPort;
+
+			this.AddressPredicate = DefaultAddressPredicate;
+			this.FakeAddressAction = DefaultFakeAddressAction;
+	
+			this.buffersPool = buffersPool;
+			this.config = config;
+
+			this.nextPort = config.MinPort;
 		}
 
 		public event EventHandler<ServerChangeEventArgs> ServerRemoved;
@@ -65,6 +51,7 @@ namespace SocketServers
 		public event EventHandler<ServerInfoEventArgs> ServerInfo;
 		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs, bool> Received;
 		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs> Sent;
+		public event ServerEventHandlerVal<ServersManager, ServerConnectionEventArgs> NewConnection;
 
 		private static bool DefaultAddressPredicate(NetworkInterface interface1, IPInterfaceProperties properties, UnicastIPAddressInformation addrInfo)
 		{
@@ -99,6 +86,18 @@ namespace SocketServers
 			}
 		}
 
+		public Func<NetworkInterface, IPInterfaceProperties, UnicastIPAddressInformation, bool> AddressPredicate
+		{
+			get;
+			set;
+		}
+
+		public Func<ServerEndPoint, IPEndPoint> FakeAddressAction
+		{
+			get;
+			set;
+		}
+
 		public BuffersPool<ServerAsyncEventArgs> BuffersPool
 		{
 			get { return buffersPool; }
@@ -124,7 +123,7 @@ namespace SocketServers
 				if (nextPort < 0)
 					throw new InvalidOperationException(@"Port range was not assigned");
 
-				for (int i = 0; i < maxPort - minPort; i++)
+				for (int i = 0; i < config.MaxPort - config.MinPort; i++)
 				{
 					pp.Port = nextPort++;
 
@@ -213,7 +212,7 @@ namespace SocketServers
 							var properties = interface1.GetIPProperties();
 							foreach (var addressInfo in properties.UnicastAddresses)
 							{
-								if (addressPredicate(interface1, properties, addressInfo))
+								if (AddressPredicate(interface1, properties, addressInfo))
 									networkAddressInfos.Add(addressInfo);
 							}
 						}
@@ -250,13 +249,14 @@ namespace SocketServers
 					if (info.ServerEndPoint.AddressFamily == AddressFamily.InterNetwork)
 					{
 						if (info.AddressInformation.IPv4Mask != null)
-							fakeEndpoint = fakeAddressAction(info.ServerEndPoint);
+							fakeEndpoint = FakeAddressAction(info.ServerEndPoint);
 					}
 
-					var server = Server.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, buffersPool, info.ProtocolPort.InitialBufferSize);
+					var server = Server.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, buffersPool, config);
 					server.Received = Server_Received;
 					server.Sent = Server_Sent;
 					server.Failed = Server_Failed;
+					server.NewConnection = Server_NewConnection;
 
 					try
 					{
@@ -318,6 +318,12 @@ namespace SocketServers
 			servers.Remove(server.LocalEndPoint);
 			OnServerRemoved(server);
 			OnServerInfo(e);
+		}
+
+		private void Server_NewConnection(Server server, ServerConnectionEventArgs e)
+		{
+			if (NewConnection != null)
+				NewConnection(this, e);
 		}
 
 		private void OnServerAdded(Server server)

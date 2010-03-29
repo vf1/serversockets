@@ -14,7 +14,6 @@ namespace SocketServers
 		protected bool isRunning;
 		protected BuffersPool<ServerAsyncEventArgs> buffersPool;
 		protected ServerEndPoint realEndPoint;
-		protected int initialBufferSize;
 		private ServerEndPoint fakeEndPoint;
 		private long ip4Mask;
 		private long ip4Subnet;
@@ -26,6 +25,7 @@ namespace SocketServers
 		public ServerEventHandlerVal<Server, ServerInfoEventArgs> Failed;
 		public ServerEventHandlerRef<Server, ServerAsyncEventArgs, bool> Received;
 		public ServerEventHandlerVal<Server, ServerAsyncEventArgs> Sent;
+		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> NewConnection;
 
 		public abstract void Start();
 		public abstract void Stop();
@@ -51,19 +51,7 @@ namespace SocketServers
 		{
 			if (Received != null)
 			{
-				e.LocalEndPoint = null;
-
-				if (fakeEndPoint != null && IPAddress.IsLoopback(e.RemoteEndPoint.Address) == false)
-				{
-					long remote = GetIPv4Long(e.RemoteEndPoint.Address);
-
-					if ((remote & ip4Mask) != ip4Subnet)
-						e.LocalEndPoint = fakeEndPoint;
-				}
-
-				if (e.LocalEndPoint == null)
-					e.LocalEndPoint = realEndPoint;
-
+				e.LocalEndPoint = GetLocalEndpoint(e.RemoteEndPoint.Address);
 				return Received(this, ref e);
 			}
 
@@ -76,20 +64,26 @@ namespace SocketServers
 				Failed(this, e);
 		}
 
-		public static Server Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, int initialBufferSize)
+		protected virtual void OnNewConnection(EndPoint remote, int connectionId)
+		{
+			if (NewConnection != null)
+				NewConnection(this, new ServerConnectionEventArgs(
+					GetLocalEndpoint((remote as IPEndPoint).Address), connectionId));
+		}
+
+		public static Server Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
 		{
 			Server server = null;
 
 			if (real.Protocol == ServerIpProtocol.Tcp)
-				server = new TcpServer();
+				server = new TcpServer(config);
 			else if (real.Protocol == ServerIpProtocol.Udp)
-				server = new UdpServer();
+				server = new UdpServer(config);
 			else
 				throw new InvalidOperationException(@"Protocol is not supported.");
 
 			server.realEndPoint = real.Clone();
 			server.buffersPool = buffersPool;
-			server.initialBufferSize = initialBufferSize;
 
 			if (ip4fake != null)
 			{
@@ -102,6 +96,19 @@ namespace SocketServers
 			}
 
 			return server;
+		}
+
+		public ServerEndPoint GetLocalEndpoint(IPAddress addr)
+		{
+			if (fakeEndPoint != null && IPAddress.IsLoopback(addr) == false)
+			{
+				long remote = GetIPv4Long(addr);
+
+				if ((remote & ip4Mask) != ip4Subnet)
+					return fakeEndPoint;
+			}
+
+			return realEndPoint;
 		}
 
 		private static long GetIPv4Long(IPAddress address)

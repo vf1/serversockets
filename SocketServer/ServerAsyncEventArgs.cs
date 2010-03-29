@@ -49,26 +49,17 @@ namespace SocketServers
 			set;
 		}
 
+		public int ConnectionId
+		{
+			get;
+			internal set;
+		}
+
 		#region SocketAsyncEventArgs
 
 		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
 		{
 			return serverArgs.socketArgs;
-		}
-
-		public int Offset
-		{
-			get { return socketArgs.Offset; }
-		}
-
-		public int BytesTransferred 
-		{
-			get { return socketArgs.BytesTransferred; }
-		}
-
-		public int BytesUsed
-		{
-			get { return socketArgs.Offset + socketArgs.BytesTransferred; }
 		}
 
 		public SocketError SocketError 
@@ -100,52 +91,104 @@ namespace SocketServers
 			RemoteEndPoint.Port = 0;
 		}
 
-		public byte[] Buffer
-		{
-			get { return socketArgs.Buffer; } 
-		}
-
 		#endregion
 
 		#region Buffer functions
 
+		/// <summary>
+		/// Gets the data buffer to use with an asynchronous socket method.
+		/// </summary>
+		public byte[] Buffer
+		{
+			get { return socketArgs.Buffer; }
+		}
+
+		/// <summary>
+		/// Gets the offset, in bytes, into the data buffer referenced by the Buffer property.
+		/// </summary>
+		public int Offset
+		{
+			get;
+			private set;
+		}
+
+		/// <summary>
+		/// Gets the number of total bytes transferred in a continue socket operations.
+		/// </summary>
+		public int BytesTransferred
+		{
+			get { return socketArgs.Offset - Offset + socketArgs.BytesTransferred; }
+		}
+
+		/// <summary>
+		/// Sets the data buffer to use with an asynchronous socket method.
+		/// </summary>
 		public void SetBuffer()
 		{
-			SetBuffer((socketArgs.Buffer != null) ? socketArgs.Buffer.Length : defaultSize);
+			SetBuffer(0);
 		}
 
-		public void SetBuffer(int length)
+		/// <summary>
+		/// Sets the data buffer to use with an asynchronous socket method.
+		/// </summary>
+		/// <param name="offset"></param>
+		public void SetBuffer(int offset)
 		{
-			if (socketArgs.Buffer != null && length <= socketArgs.Buffer.Length)
-				socketArgs.SetBuffer(0, length);
+			SetBuffer(offset, (socketArgs.Buffer != null) ? socketArgs.Buffer.Length : defaultSize);
+		}
+
+		/// <summary>
+		/// Sets the data buffer to use with an asynchronous socket method.
+		/// </summary>
+		/// <param name="offset"></param>
+		/// <param name="length"></param>
+		public void SetBuffer(int offset, int length)
+		{
+			Offset = offset;
+
+			if (socketArgs.Buffer != null && (offset + length) <= socketArgs.Buffer.Length)
+				socketArgs.SetBuffer(offset, length);
 			else
-				socketArgs.SetBuffer(NewBuffer(length), 0, length);
+				socketArgs.SetBuffer(NewBuffer(length), offset, length);
 		}
 
-		public void ContinueBuffer(int length)
+		/// <summary>
+		/// Extend buffer size for socket operations.
+		/// </summary>
+		/// <param name="newLength"></param>
+		public void ContinueBuffer(int newLength)
 		{
-			int newOffset = socketArgs.Offset + socketArgs.BytesTransferred;
+			int newBufferLength = Offset + newLength;
 
-			if (length <= socketArgs.Buffer.Length)
-				socketArgs.SetBuffer(newOffset, length - newOffset);
+			if (newBufferLength <= socketArgs.Buffer.Length)
+				socketArgs.SetBuffer(ContinueOffset, newLength - BytesTransferred);
 			else
 			{
-				byte[] newBuffer = NewBuffer(length);
+				byte[] newBuffer = NewBuffer(newBufferLength);
 				Array.Copy(socketArgs.Buffer, newBuffer, socketArgs.Buffer.Length);
 
-				socketArgs.SetBuffer(newBuffer, newOffset, length - newOffset);
+				socketArgs.SetBuffer(newBuffer, ContinueOffset, newLength - BytesTransferred);
 			}
 		}
 
+		/// <summary>
+		/// Prepare buffer for next operation if not all expected data was receieved.
+		/// </summary>
+		/// <returns>False when all data received</returns>
 		public bool ContinueBuffer()
 		{
 			if (socketArgs.BytesTransferred < socketArgs.Count)
 			{
-				socketArgs.SetBuffer(socketArgs.Offset + socketArgs.BytesTransferred, socketArgs.Count - socketArgs.BytesTransferred);
+				socketArgs.SetBuffer(ContinueOffset, socketArgs.Count - socketArgs.BytesTransferred);
 				return true;
 			}
 
 			return false;
+		}
+
+		private int ContinueOffset
+		{
+			get { return socketArgs.Offset + socketArgs.BytesTransferred; }
 		}
 
 		private byte[] NewBuffer(int length)
@@ -154,7 +197,7 @@ namespace SocketServers
 		}
 
 
-		private static int defaultSize = 2048;
+		internal static int defaultSize = 4096;
 
 		public int GetBufferSize(int requredSize)
 		{

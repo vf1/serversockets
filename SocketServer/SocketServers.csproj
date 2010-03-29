@@ -44,11 +44,14 @@
     <Compile Include="SafeStack.cs" />
     <Compile Include="ServerAsyncEventArgs.cs" />
     <Compile Include="ServerChangeEventArgs.cs" />
+    <Compile Include="ServerConnectionEventArgs.cs" />
     <Compile Include="ServerEndPoint.cs" />
     <Compile Include="ServerInfoEventArgs.cs" />
+    <Compile Include="ServersManagerConfig.cs" />
     <Compile Include="ServersManager.cs" />
     <Compile Include="ServersManager.EndpointInfo.cs" />
     <Compile Include="Server.cs" />
+    <Compile Include="SocketEx.cs" />
     <Compile Include="TcpServer.cs" />
     <Compile Include="UdpServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
