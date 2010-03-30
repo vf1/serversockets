@@ -250,7 +250,12 @@ namespace SocketServers
 			if (initialBufferSize > 0)
 				e.SetBuffer(initialOffset, initialBufferSize);
 			else
-				e.SetBuffer(initialOffset);
+			{
+				int length = e.BufferCapacity - initialOffset;
+				if (length < 1024)
+					length = 1024;
+				e.SetBuffer(initialOffset, length);
+			}
 		}
 	}
 }

@@ -103,6 +103,11 @@ namespace SocketServers
 			get { return socketArgs.Buffer; }
 		}
 
+		public int BufferCapacity
+		{
+			get { return (socketArgs.Buffer != null) ? socketArgs.Buffer.Length : defaultSize; }
+		}
+
 		/// <summary>
 		/// Gets the offset, in bytes, into the data buffer referenced by the Buffer property.
 		/// </summary>
@@ -123,18 +128,27 @@ namespace SocketServers
 		/// <summary>
 		/// Sets the data buffer to use with an asynchronous socket method.
 		/// </summary>
-		public void SetBuffer()
+		public void SetMaxBuffer()
 		{
-			SetBuffer(0);
+			SetBuffer(0, BufferCapacity);
 		}
 
 		/// <summary>
-		/// Sets the data buffer to use with an asynchronous socket method.
+		/// == SetBuffer(Offset, BytesTransferred)
 		/// </summary>
-		/// <param name="offset"></param>
-		public void SetBuffer(int offset)
+		/// <param name="length"></param>
+		public void SetBuffer()
 		{
-			SetBuffer(offset, (socketArgs.Buffer != null) ? socketArgs.Buffer.Length : defaultSize);
+			SetBuffer(Offset, BytesTransferred);
+		}
+
+		/// <summary>
+		/// == SetBuffer(e.Offset, length)
+		/// </summary>
+		/// <param name="length"></param>
+		public void SetBuffer(int length)
+		{
+			SetBuffer(Offset, length);
 		}
 
 		/// <summary>
@@ -149,7 +163,7 @@ namespace SocketServers
 			if (socketArgs.Buffer != null && (offset + length) <= socketArgs.Buffer.Length)
 				socketArgs.SetBuffer(offset, length);
 			else
-				socketArgs.SetBuffer(NewBuffer(length), offset, length);
+				socketArgs.SetBuffer(NewBuffer(offset + length), offset, length);
 		}
 
 		/// <summary>
