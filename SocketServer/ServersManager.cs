@@ -12,6 +12,7 @@ using System.Threading;
 namespace SocketServers
 {
 	public partial class ServersManager
+		: IDisposable
 	{
 		private object sync;
 		private bool running;
@@ -75,7 +76,7 @@ namespace SocketServers
 			}
 		}
 
-		public void Stop()
+		public void Dispose()
 		{
 			NetworkChange.NetworkAddressChanged -= NetworkChange_NetworkAddressChanged;
 
@@ -283,7 +284,7 @@ namespace SocketServers
 			if (error != SocketError.Success)
 			{
 				foreach (var server in created)
-					server.Stop();
+					server.Dispose();
 			}
 			else
 			{
@@ -341,7 +342,7 @@ namespace SocketServers
 
 		private void OnServerRemoved(Server server)
 		{
-			server.Stop();
+			server.Dispose();
 
 			if (server.FakeEndPoint != null)
 			{

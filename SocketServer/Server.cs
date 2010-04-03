@@ -10,6 +10,7 @@ using System.Collections.Generic;
 namespace SocketServers
 {
 	abstract class Server
+		: IDisposable
 	{
 		protected bool isRunning;
 		protected BuffersPool<ServerAsyncEventArgs> buffersPool;
@@ -28,7 +29,7 @@ namespace SocketServers
 		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> NewConnection;
 
 		public abstract void Start();
-		public abstract void Stop();
+		public abstract void Dispose();
 		public abstract void SendAsync(ServerAsyncEventArgs e, bool connect);
 
 		public ServerEndPoint LocalEndPoint

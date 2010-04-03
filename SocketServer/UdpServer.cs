@@ -37,7 +37,7 @@ namespace SocketServers
 			}
 		}
 
-		public override void Stop()
+		public override void Dispose()
 		{
 			isRunning = false;
 
@@ -82,7 +82,7 @@ namespace SocketServers
 				{
 					if (isRunning)
 					{
-						Stop();
+						Dispose();
 						OnFailed(new ServerInfoEventArgs(realEndPoint, e.SocketError));
 					}
 				}

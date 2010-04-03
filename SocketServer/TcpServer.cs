@@ -62,7 +62,7 @@ namespace SocketServers
 			}
 		}
 
-		public override void Stop()
+		public override void Dispose()
 		{
 			isRunning = false;
 
