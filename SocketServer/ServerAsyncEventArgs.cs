@@ -13,6 +13,7 @@ namespace SocketServers
 		, IBuffersPoolItem
 	{
 		public const int DefaultUserToken1 = -1;
+		public const object DefaultUserToken2 = null;
 
 		private SocketAsyncEventArgs socketArgs;
 
@@ -29,11 +30,13 @@ namespace SocketServers
 			socketArgs.Completed += SocketArgs_Completed;
 
 			UserToken1 = DefaultUserToken1;
+			UserToken2 = DefaultUserToken2;
 		}
 
 		void IBuffersPoolItem.Reset()
 		{
 			UserToken1 = DefaultUserToken1;
+			UserToken2 = DefaultUserToken2;
 			Completed = null;
 		}
 
@@ -44,6 +47,12 @@ namespace SocketServers
 		}
 
 		public int UserToken1
+		{
+			get;
+			set;
+		}
+
+		public object UserToken2
 		{
 			get;
 			set;

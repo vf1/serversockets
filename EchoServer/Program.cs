@@ -63,7 +63,7 @@ namespace EchoServer
 
 			try
 			{
-				serversManager.Stop();
+				serversManager.Dispose();
 				Console.WriteLine(@"Stopped");
 			}
 			catch (Exception ex)
