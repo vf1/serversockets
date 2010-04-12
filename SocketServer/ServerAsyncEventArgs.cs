@@ -14,6 +14,8 @@ namespace SocketServers
 	{
 		public const int DefaultUserToken1 = -1;
 		public const object DefaultUserToken2 = null;
+		public const int AnyNewConnectionId = -1;
+		public const int AnyConnectionId = -2;
 
 		private SocketAsyncEventArgs socketArgs;
 
@@ -37,6 +39,7 @@ namespace SocketServers
 		{
 			UserToken1 = DefaultUserToken1;
 			UserToken2 = DefaultUserToken2;
+			ConnectionId = AnyNewConnectionId;
 			Completed = null;
 		}
 

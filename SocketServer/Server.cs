@@ -9,7 +9,7 @@ using System.Collections.Generic;
 
 namespace SocketServers
 {
-	abstract class Server
+	abstract partial class Server
 		: IDisposable
 	{
 		protected bool isRunning;
@@ -30,7 +30,7 @@ namespace SocketServers
 
 		public abstract void Start();
 		public abstract void Dispose();
-		public abstract void SendAsync(ServerAsyncEventArgs e, bool connect);
+		public abstract void SendAsync(ServerAsyncEventArgs e);
 
 		public ServerEndPoint LocalEndPoint
 		{
@@ -65,11 +65,22 @@ namespace SocketServers
 				Failed(this, e);
 		}
 
-		protected virtual void OnNewConnection(EndPoint remote, int connectionId)
+		protected virtual void OnNewConnection(Connection connection)
 		{
 			if (NewConnection != null)
-				NewConnection(this, new ServerConnectionEventArgs(
-					GetLocalEndpoint((remote as IPEndPoint).Address), connectionId));
+			{
+				try
+				{
+					IPEndPoint remote = connection.Socket.RemoteEndPoint as IPEndPoint;
+
+					NewConnection(this, new ServerConnectionEventArgs(
+						GetLocalEndpoint((remote as IPEndPoint).Address), remote as IPEndPoint, connection.Id));
+				}
+				catch (ObjectDisposedException)
+				{
+					// Socket was disposed -- no event
+				}
+			}
 		}
 
 		public static Server Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)

@@ -3,19 +3,22 @@
 // Please see Notice.txt for details.
 
 using System;
+using System.Net;
 
 namespace SocketServers
 {
 	public class ServerConnectionEventArgs
 		: EventArgs
 	{
-		public ServerConnectionEventArgs(ServerEndPoint serverEndPoint, int connectionId)
+		public ServerConnectionEventArgs(ServerEndPoint localEndPoint, IPEndPoint remoteEndPoint, int connectionId)
 		{
-			ServerEndPoint = serverEndPoint;
+			LocalEndPoint = localEndPoint;
+			RemoteEndPoint = remoteEndPoint;
 			ConnectionId = connectionId;
 		}
 
-		public ServerEndPoint ServerEndPoint { get; private set; }
+		public ServerEndPoint LocalEndPoint { get; private set; }
+		public IPEndPoint RemoteEndPoint { get; private set;}
 		public int ConnectionId { get; private set; }
 	}
 }

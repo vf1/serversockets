@@ -151,11 +151,6 @@ namespace SocketServers
 
 		public void SendAsync(ServerAsyncEventArgs eventArgs)
 		{
-			SendAsync(eventArgs, true);
-		}
-
-		public void SendAsync(ServerAsyncEventArgs eventArgs, bool connect)
-		{
 			var server = servers.GetValue(eventArgs.LocalEndPoint);
 
 			if (server == null)
@@ -163,7 +158,7 @@ namespace SocketServers
 
 			if (server != null)
 			{
-				server.SendAsync(eventArgs, connect);
+				server.SendAsync(eventArgs);
 			}
 			else
 			{

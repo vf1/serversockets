@@ -139,7 +139,7 @@ namespace EchoServer
 
 		static void ServersManager_NewConnection(ServersManager s, ServerConnectionEventArgs e)
 		{
-			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.ServerEndPoint.ToString(), e.ConnectionId);
+			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.LocalEndPoint.ToString(), e.ConnectionId);
 		}
 	}
 }

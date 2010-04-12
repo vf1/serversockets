@@ -51,7 +51,7 @@ namespace SocketServers
 			}
 		}
 
-		public override void SendAsync(ServerAsyncEventArgs e, bool connect)
+		public override void SendAsync(ServerAsyncEventArgs e)
 		{
 			e.Completed = Send_Completed;
 			if (socket.SendToAsync(e) == false)

@@ -16,8 +16,7 @@ namespace SocketServers
 		private object sync;
 		private Socket listener;
 		private SocketAsyncEventArgs[] acceptEventArgs;
-		private SafeDictionary<EndPoint, Socket> connections;
-		private static int connectionCount;
+		private SafeDictionary<EndPoint, Connection> connections;
 		private int initialBufferSize;
 		private int initialOffset;
 
@@ -36,7 +35,7 @@ namespace SocketServers
 			{
 				isRunning = true;
 
-				connections = new SafeDictionary<EndPoint, Socket>();
+				connections = new SafeDictionary<EndPoint, Connection>();
 
 				listener = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
@@ -70,7 +69,7 @@ namespace SocketServers
 			{
 				if (listener != null)
 				{
-					connections.ForEach((socket) => { socket.SafeShutdownClose(); });
+					connections.ForEach((c) => { c.Socket.SafeShutdownClose(); });
 					connections.Clear();
 
 					listener.Close();
@@ -79,26 +78,26 @@ namespace SocketServers
 			}
 		}
 
-		public override void SendAsync(ServerAsyncEventArgs e, bool connect)
+		public override void SendAsync(ServerAsyncEventArgs e)
 		{
-			Socket socket = null;
+			Connection connection = null;
 
-			if (connections.TryGetValue(e.RemoteEndPoint, out socket))
+			if (connections.TryGetValue(e.RemoteEndPoint, out connection))
 			{
-				if (socket.Connected == false)
+				if (connection.Socket.Connected == false)
 				{
-					socket.SafeShutdownClose();
-					socket = null;
+					connection.Socket.SafeShutdownClose();
+					connection = null;
 
 					connections.Remove(e.RemoteEndPoint);
 				}
 			}
 
-			if (socket == null)
+			if (connection == null)
 			{
-				if (connect)
+				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId)
 				{
-					socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					Socket socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
 					socket.Bind(realEndPoint);
 
@@ -108,40 +107,54 @@ namespace SocketServers
 				{
 					e.Completed = Send_Completed;
 					e.SocketError = SocketError.NotConnected;
-					e.OnCompleted(socket);
+					e.OnCompleted(null);
 				}
 			}
 			else
 			{
-				socket.SendAsync(e, Send_Completed);
+				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId ||
+					e.ConnectionId == ServerAsyncEventArgs.AnyConnectionId ||
+					e.ConnectionId == connection.Id)
+				{
+					connection.Socket.SendAsync(e, Send_Completed);
+				}
+				else
+				{
+					e.Completed = Send_Completed;
+					e.SocketError = SocketError.NotConnected;
+					e.OnCompleted(null);
+				}
 			}
 		}
 
-		private void Connect_Completed(Socket socket, ServerAsyncEventArgs e)
+		private void Connect_Completed(Socket socket1, ServerAsyncEventArgs e)
 		{
 			bool beginReceive = false;
+			Connection connection = null;
 
 			if (e.SocketError == SocketError.Success)
 			{
-				connections.Add(e.RemoteEndPoint, socket);
+				connection = new Connection(socket1);
+				connections.Add(e.RemoteEndPoint, connection);
 				beginReceive = true;
 			}
 			else
 			{
 				while (e.SocketError == SocketError.AddressAlreadyInUse)
 				{
-					if (connections.TryGetValue(e.RemoteEndPoint, out socket))
+					if (connections.TryGetValue(e.RemoteEndPoint, out connection))
 						break;
 
 					Thread.Sleep(0);
 
-					if (socket.ConnectAsync(e))
+					if (socket1.ConnectAsync(e))
 						return;
 					else
 					{
 						if (e.SocketError == SocketError.Success)
 						{
-							connections.Add(e.RemoteEndPoint, socket);
+							connection = new Connection(socket1);
+							connections.Add(e.RemoteEndPoint, connection);
 							beginReceive = true;
 						}
 					}
@@ -152,15 +165,15 @@ namespace SocketServers
 			//
 			if (e.SocketError == SocketError.Success)
 			{
-				socket.SendAsync(e, Send_Completed);
+				connection.Socket.SendAsync(e, Send_Completed);
 
 				if (beginReceive)
-					BeginReceive(socket);
+					BeginReceive(connection);
 			}
 			else
 			{
 				e.Completed = Send_Completed;
-				e.OnCompleted(socket);
+				e.OnCompleted(socket1);
 			}
 		}
 
@@ -172,31 +185,29 @@ namespace SocketServers
 			}
 			else
 			{
-				Socket socket = acceptEventArgs.AcceptSocket;
+				Connection connection = new Connection(acceptEventArgs.AcceptSocket);
 
 				if (acceptEventArgs.SocketError == SocketError.Success)
-					connections.Add(socket.RemoteEndPoint, socket);
+					connections.Add(connection.Socket.RemoteEndPoint, connection);
 
 				acceptEventArgs.AcceptSocket = null;
 				if (listener.AcceptAsync(acceptEventArgs) == false)
 					Accept_Completed(listener, acceptEventArgs);
 
 				if (isRunning)
-					BeginReceive(socket);
+					BeginReceive(connection);
 			}
 		}
 
-		private void BeginReceive(Socket socket)
+		private void BeginReceive(Connection connection)
 		{
-			int connectionId = Interlocked.Increment(ref connectionCount);
-
 			var e = buffersPool.Get();
-			PrepareBuffer(e, socket.RemoteEndPoint, connectionId);
+			PrepareBuffer(e, connection.Socket.RemoteEndPoint, connection.Id);
 
-			OnNewConnection(socket.RemoteEndPoint, connectionId);
+			OnNewConnection(connection);
 
-			if (socket.ReceiveAsync(e) == false)
-				e.OnCompleted(socket);
+			if (connection.Socket.ReceiveAsync(e) == false)
+				e.OnCompleted(connection.Socket);
 		}
 
 		private void Receive_Completed(Socket socket, ServerAsyncEventArgs e)

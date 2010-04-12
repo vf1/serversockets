@@ -42,6 +42,7 @@
     <Compile Include="ProtocolPort.cs" />
     <Compile Include="SafeDictionary.cs" />
     <Compile Include="SafeStack.cs" />
+    <Compile Include="Server.Connection.cs" />
     <Compile Include="ServerAsyncEventArgs.cs" />
     <Compile Include="ServerChangeEventArgs.cs" />
     <Compile Include="ServerConnectionEventArgs.cs" />
