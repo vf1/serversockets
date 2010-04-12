@@ -87,9 +87,11 @@ namespace SocketServers
 				if (connection.Socket.Connected == false)
 				{
 					connection.Socket.SafeShutdownClose();
-					connection = null;
 
 					connections.Remove(e.RemoteEndPoint);
+
+					OnEndConnection(connection.Id);
+					connection = null;
 				}
 			}
 
@@ -232,6 +234,7 @@ namespace SocketServers
 
 						connections.Remove(socket.RemoteEndPoint);
 						socket.SafeShutdownClose();
+						OnEndConnection(connectionId);
 						break;
 					}
 

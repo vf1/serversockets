@@ -27,6 +27,7 @@ namespace SocketServers
 		public ServerEventHandlerRef<Server, ServerAsyncEventArgs, bool> Received;
 		public ServerEventHandlerVal<Server, ServerAsyncEventArgs> Sent;
 		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> NewConnection;
+		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> EndConnection;
 
 		public abstract void Start();
 		public abstract void Dispose();
@@ -80,6 +81,14 @@ namespace SocketServers
 				{
 					// Socket was disposed -- no event
 				}
+			}
+		}
+
+		protected virtual void OnEndConnection(int connectionId)
+		{
+			if (EndConnection != null)
+			{
+				EndConnection(this, new ServerConnectionEventArgs(null, null, connectionId));
 			}
 		}
 

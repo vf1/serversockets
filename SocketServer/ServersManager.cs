@@ -53,6 +53,7 @@ namespace SocketServers
 		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs, bool> Received;
 		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs> Sent;
 		public event ServerEventHandlerVal<ServersManager, ServerConnectionEventArgs> NewConnection;
+		public event ServerEventHandlerVal<ServersManager, ServerConnectionEventArgs> EndConnection;
 
 		private static bool DefaultAddressPredicate(NetworkInterface interface1, IPInterfaceProperties properties, UnicastIPAddressInformation addrInfo)
 		{
@@ -253,6 +254,7 @@ namespace SocketServers
 					server.Sent = Server_Sent;
 					server.Failed = Server_Failed;
 					server.NewConnection = Server_NewConnection;
+					server.EndConnection = Server_EndConnection;
 
 					try
 					{
@@ -320,6 +322,12 @@ namespace SocketServers
 		{
 			if (NewConnection != null)
 				NewConnection(this, e);
+		}
+
+		private void Server_EndConnection(Server server, ServerConnectionEventArgs e)
+		{
+			if (EndConnection != null)
+				EndConnection(this, e);
 		}
 
 		private void OnServerAdded(Server server)
