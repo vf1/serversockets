@@ -31,11 +31,10 @@ namespace SocketServers
 
 			socketArgs.Completed += SocketArgs_Completed;
 
-			UserToken1 = DefaultUserToken1;
-			UserToken2 = DefaultUserToken2;
+			Reset();
 		}
 
-		void IBuffersPoolItem.Reset()
+		public void Reset() // IBuffersPoolItem
 		{
 			UserToken1 = DefaultUserToken1;
 			UserToken2 = DefaultUserToken2;
@@ -64,7 +63,7 @@ namespace SocketServers
 		public int ConnectionId
 		{
 			get;
-			internal set;
+			set;
 		}
 
 		#region SocketAsyncEventArgs
