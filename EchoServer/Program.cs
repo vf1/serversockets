@@ -13,14 +13,40 @@ namespace EchoServer
 	{
 		static void Main(string[] args)
 		{
+			int serverPort = 5070;
+			if (args.Length >= 1)
+				int.TryParse(args[0], out serverPort);
+			Console.WriteLine("Server Port: {0}", serverPort);
+
+			IPEndPoint real = null, fake = null;
+			if (args.Length >= 4)
+			{
+				int fakePort;
+				IPAddress realIp, fakeIp;
+				if (IPAddress.TryParse(args[1], out realIp) && IPAddress.TryParse(args[2], out fakeIp) &&
+					int.TryParse(args[3], out fakePort))
+				{
+					real = new IPEndPoint(realIp, serverPort);
+					fake = new IPEndPoint(fakeIp, fakePort);
+					Console.WriteLine("Fake and real IP parsed.");
+					Console.WriteLine("Real - Fake: {0} <=> {1}", real, fake);
+				}
+			}
+
 			Console.Write(@"Initialize...");
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
 			var serversManager = new ServersManager(256, new ServersManagerConfig() { TcpInitialBufferSize = 128, TcpInitialOffset = 256, });
-			serversManager.FakeAddressAction = (ServerEndPoint real) => { return new IPEndPoint(address, port++); };
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = 5070, });
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Udp, Port = 5070, });
+			serversManager.FakeAddressAction =
+				(ServerEndPoint real1) =>
+				{
+					if (real != null && real.Equals(real1))
+						return fake;
+					return new IPEndPoint(address, port++);
+				};
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = serverPort, });
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Udp, Port = serverPort, });
 			serversManager.ServerAdded += ServersManager_ServerAdded;
 			serversManager.ServerRemoved += ServersManager_ServerRemoved;
 			serversManager.ServerInfo += ServersManager_ServerInfo;

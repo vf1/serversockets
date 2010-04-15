@@ -112,7 +112,7 @@ namespace BufferPoolTest
 			Console.WriteLine(@"Buffer created: #{0}", Index + 1);
 		}
 
-		void IBuffersPoolItem.Reset()
+		void IBuffersPoolItem.SetDefaultValues()
 		{
 		}
 	}

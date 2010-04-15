@@ -55,7 +55,7 @@ namespace SocketServers
 
 		public void Put(T value)
 		{
-			value.Reset();
+			value.SetDefaultValues();
 
 			int index = empty.Pop();
 			if (index >= 0)
@@ -79,6 +79,6 @@ namespace SocketServers
 
 	public interface IBuffersPoolItem
 	{
-		void Reset();
+		void SetDefaultValues();
 	}
 }

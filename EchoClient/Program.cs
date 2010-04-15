@@ -12,17 +12,48 @@ namespace EchoClient
 	{
 		static void Main(string[] args)
 		{
-			IPEndPoint server1 = new IPEndPoint(IPAddress.Parse(@"192.168.1.15"), 5070);
-			IPEndPoint server2 = new IPEndPoint(IPAddress.Parse(@"::1"), 5070);
+			if (args.Length < 2)
+			{
+				Console.WriteLine("Specify at least port number and IPv4 address.");
+				Console.WriteLine("EchoClient Port IPv4 [IPv6]");
+				Console.WriteLine("Example: EchoClient 5070 192.168.1.1 ::1");
+				return;
+			}
+
+			int port;
+			if (int.TryParse(args[0], out port) == false || port > 65535 || port < 1024)
+			{
+				Console.WriteLine("Invalid Port Number #1");
+				return;
+			}
+
+			IPAddress ip4;
+			if (IPAddress.TryParse(args[1], out ip4) == false)
+			{
+				Console.WriteLine("Invalid IP #1");
+				return;
+			}
+
+			IPAddress ip6 = null;
+			if (args.Length >= 3 && IPAddress.TryParse(args[2], out ip6) == false)
+			{
+				Console.WriteLine("Invalid IP #2");
+				return;
+			}
+
+			IPEndPoint server1 = new IPEndPoint(ip4, port);
+			IPEndPoint server2 = (ip6 != null) ? new IPEndPoint(ip6, port) : null;
 
 			Console.WriteLine(@"EchoClient");
 			Console.WriteLine(@"Sleep 5 seconds");
 			System.Threading.Thread.Sleep(5000);
 
 			EchoTcp(server1);
-			EchoTcp(server2);
+			if (server2 != null)
+				EchoTcp(server2);
 			EchoUdp(server1);
-			EchoUdp(server2);
+			if (server2 != null)
+				EchoUdp(server2);
 
 			Console.WriteLine(@"Press any key to stop client...");
 			Console.ReadKey();

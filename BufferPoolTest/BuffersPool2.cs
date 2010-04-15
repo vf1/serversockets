@@ -53,7 +53,7 @@ namespace SocketServers
 
 		public void Put(T item)
 		{
-			item.Reset();
+			item.SetDefaultValues();
 
 			for (int i = count % maxThread; count < items.Length; i = (i + 1) % maxThread)
 			{

@@ -31,10 +31,10 @@ namespace SocketServers
 
 			socketArgs.Completed += SocketArgs_Completed;
 
-			Reset();
+			SetDefaultValues();
 		}
 
-		public void Reset() // IBuffersPoolItem
+		public void SetDefaultValues()
 		{
 			UserToken1 = DefaultUserToken1;
 			UserToken2 = DefaultUserToken2;
