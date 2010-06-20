@@ -100,6 +100,8 @@ namespace SocketServers
 				server = new TcpServer(config);
 			else if (real.Protocol == ServerIpProtocol.Udp)
 				server = new UdpServer(config);
+			else if (real.Protocol == ServerIpProtocol.Tls)
+				server = new SspiTlsServer(config);
 			else
 				throw new InvalidOperationException(@"Protocol is not supported.");
 

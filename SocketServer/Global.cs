@@ -8,6 +8,7 @@ namespace SocketServers
 	{
 		Udp,
 		Tcp,
+		Tls,
 	}
 
 	public delegate void ServerEventHandlerVal<S, T>(S s, T e);

@@ -54,6 +54,7 @@
     <Compile Include="Server.cs" />
     <Compile Include="SocketEx.cs" />
     <Compile Include="TcpServer.cs" />
+    <Compile Include="SspiTlsServer.cs" />
     <Compile Include="UdpServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
