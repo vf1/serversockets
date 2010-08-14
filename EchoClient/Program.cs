@@ -5,6 +5,11 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using System.IO;
+using System.Threading;
 
 namespace EchoClient
 {
@@ -12,6 +17,12 @@ namespace EchoClient
 	{
 		static void Main(string[] args)
 		{
+		//	System.Threading.Thread.Sleep(2000);
+		//	var sslClient = new SslClient();
+		//	sslClient.RunClient("localhost", "localhost");
+
+		//	return;
+
 			if (args.Length < 2)
 			{
 				Console.WriteLine("Specify at least port number and IPv4 address.");
@@ -48,12 +59,14 @@ namespace EchoClient
 			Console.WriteLine(@"Sleep 5 seconds");
 			System.Threading.Thread.Sleep(5000);
 
+			EchoTls(new IPEndPoint(server1.Address, server1.Port + 1), 64);
+			EchoTlsSpliter(new IPEndPoint(server1.Address, server1.Port + 1));
 			EchoTcp(server1);
 			if (server2 != null)
-				EchoTcp(server2);
+			    EchoTcp(server2);
 			EchoUdp(server1);
 			if (server2 != null)
-				EchoUdp(server2);
+			    EchoUdp(server2);
 
 			Console.WriteLine(@"Press any key to stop client...");
 			Console.ReadKey();
@@ -163,5 +176,154 @@ namespace EchoClient
 				offset += socket.Receive(buffer, offset, buffer.Length - offset, SocketFlags.None);
 			return offset;
 		}
+
+		private static void EchoTls(IPEndPoint server, int maxConnections)
+		{
+			int start = Environment.TickCount;
+
+			SslStream[] streams = new SslStream[maxConnections];
+
+			Console.WriteLine(@"TLS: Create {0} TCP connections", streams.Length);
+
+			for (int i = 0; i < streams.Length; i++)
+			{
+				var client = new TcpClient();
+				client.Connect(server);
+				streams[i] = new SslStream(client.GetStream(), false, 
+					new RemoteCertificateValidationCallback(ValidateServerCertificate));
+				streams[i].AuthenticateAsClient("localhost");
+			}
+
+			var data1 = new byte[1024];
+			for (int i = 0; i < data1.Length; i++)
+				data1[i] = (byte)i;
+
+			var data2 = new byte[data1.Length];
+
+			Console.WriteLine(@"TLS: Send to {0}", server.ToString());
+
+			for (int i = 0; i < 1024 * 256; i++)
+			{
+				int x = i % streams.Length;
+
+				streams[x].Write(data1);
+				streams[x].Write(data1);
+				data1[i % 16] = (byte)i;
+				streams[x].Write(data1);
+
+				TlsReceive(streams[x], data2);
+				TlsReceive(streams[x], data2);
+
+				if (TlsReceive(streams[x], data2) != data1.Length)
+					Console.WriteLine(@"TLS: Echo Error #1");
+				else
+					for (int j = 0; j < 16; j++)
+						if (data1[j] != data2[j])
+						{
+							Console.WriteLine(@"TLS: Echo Error #2");
+							break;
+						}
+			}
+
+			for (int i = 0; i < streams.Length; i++)
+				streams[i].Close();
+
+			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+		}
+
+		private static void EchoTlsSpliter(IPEndPoint server)
+		{
+			var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			listener.Bind(new IPEndPoint(IPAddress.Any, 0));
+			listener.Listen(1024);
+
+			ThreadPool.QueueUserWorkItem(ThreadProc, (listener.LocalEndPoint as IPEndPoint).Port);
+
+			var accepted = listener.Accept();
+
+			var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			socket.NoDelay = true;
+			socket.Connect(server);
+			socket.SendBufferSize = 0;
+
+
+			var buffer = new byte[8192];
+			bool reverse = false;
+			int splitSize = 2;
+
+			ThreadPool.QueueUserWorkItem(SendDataBack, new SendDataBackParam() { accepted = accepted, connected = socket, });
+
+			while (accepted.Connected && socket.Connected)
+			{
+				int received = accepted.Receive(buffer);
+				if (received == 0)
+					break;
+
+				for (int offset = 0; offset < received; offset += splitSize)
+				{
+					int size = (received - offset > splitSize) ? splitSize : received - offset;
+					socket.Send(buffer, offset, size, SocketFlags.None);
+					Console.Write("Splitter Offset: {0}\t\r", offset);
+				}
+
+				splitSize += reverse ? -1 : +1;
+
+				if (splitSize > 1024 || splitSize < 2)
+					reverse = !reverse;
+			}
+
+			Thread.Sleep(2000);
+		}
+
+		static void ThreadProc(Object stateInfo)
+		{
+			EchoTls(new IPEndPoint(IPAddress.Loopback, (int)stateInfo), 1);
+		}
+
+		class SendDataBackParam
+		{
+			public Socket accepted;
+			public Socket connected;
+		}
+
+		static void SendDataBack(Object stateInfo)
+		{
+			var o = stateInfo as SendDataBackParam;
+			var buffer = new byte[8192];
+
+			try
+			{
+				while (o.accepted.Connected && o.connected.Connected)
+				{
+					int received = o.connected.Receive(buffer);
+					if (received == 0)
+						break;
+					o.accepted.Send(buffer, received, SocketFlags.None);
+				}
+			}
+			catch
+			{
+			}
+			o.accepted.Close();
+			o.connected.Close();
+		}
+
+		static int TlsReceive(Stream stream, byte[] buffer)
+		{
+			int offset = 0;
+			for (; offset < buffer.Length; )
+				offset += stream.Read(buffer, offset, buffer.Length - offset);
+			return offset;
+		}
+
+		public static bool ValidateServerCertificate(
+			  object sender,
+			  X509Certificate certificate,
+			  X509Chain chain,
+			  SslPolicyErrors sslPolicyErrors)
+		{
+			return true;
+		}
+
 	}
 }

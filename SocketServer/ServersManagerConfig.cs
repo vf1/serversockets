@@ -3,6 +3,7 @@
 // Please see Notice.txt for details.
 
 using System;
+using System.Security.Cryptography.X509Certificates;
 
 namespace SocketServers
 {
@@ -10,8 +11,10 @@ namespace SocketServers
 	{
 		public int MinPort;
 		public int MaxPort;
-		public int TcpInitialBufferSize;
-		public int TcpInitialOffset;
 		public int UdpQueueSize;
+		public int TcpOffsetOffset;
+		public int TcpQueueSize;
+		public int TcpAcceptQueueSize;
+		public X509Certificate2 TlsCertificate;
 	}
 }

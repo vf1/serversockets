@@ -11,7 +11,7 @@ using System.Threading;
 namespace SocketServers
 {
 	public class BuffersPool<T>
-		where T : class, IBuffersPoolItem, new()
+		where T : class, IBuffersPoolItem, IDisposable, new()
 	{
 		private SafeStackItem<T>[] array;
 		private SafeStack<T> empty;
@@ -63,6 +63,14 @@ namespace SocketServers
 				array[index].Value = value;
 
 				full.Push(index);
+			}
+			else
+			{
+#if DEBUG
+				throw new Exception(@"BufferPool too small");
+#else
+				value.Dispose();
+#endif
 			}
 		}
 

@@ -5,12 +5,14 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Collections.Generic;
 
 namespace SocketServers
 {
 	public class ServerAsyncEventArgs
 		: EventArgs
 		, IBuffersPoolItem
+		, IDisposable
 	{
 		public const int DefaultUserToken1 = -1;
 		public const object DefaultUserToken2 = null;
@@ -18,6 +20,9 @@ namespace SocketServers
 		public const int AnyConnectionId = -2;
 
 		private SocketAsyncEventArgs socketArgs;
+		private ArraySegment<byte> segment;
+		private int emulatedBytesTransfred;
+		private const int defaultSize = 4096;
 
 		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
 
@@ -40,6 +45,18 @@ namespace SocketServers
 			UserToken2 = DefaultUserToken2;
 			ConnectionId = AnyNewConnectionId;
 			Completed = null;
+			emulatedBytesTransfred = 0;
+
+			if (segment.Array != null && segment.Count != defaultSize)
+			{
+				BufferManager.Free(ref segment);
+				segment = BufferManager.Allocate(defaultSize);
+			}
+		}
+
+		public void Dispose()
+		{
+			BufferManager.Free(ref segment);
 		}
 
 		public ServerEndPoint LocalEndPoint
@@ -66,6 +83,21 @@ namespace SocketServers
 			set;
 		}
 
+		internal int SequenceNumber;
+
+		public void CopyAddressesFrom(ServerAsyncEventArgs e)
+		{
+			ConnectionId = e.ConnectionId;
+			LocalEndPoint = e.LocalEndPoint;
+			RemoteEndPoint = e.RemoteEndPoint;
+		}
+
+		public void TransferData(byte[] buffer, int offset, int size)
+		{
+			System.Buffer.BlockCopy(buffer, offset, Buffer, Offset, size);
+			socketArgs.SetBuffer(Offset + size, Count - size);
+		}
+
 		#region SocketAsyncEventArgs
 
 		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
@@ -87,8 +119,11 @@ namespace SocketServers
 			}
 			set
 			{
-				(socketArgs.RemoteEndPoint as IPEndPoint).Address = new IPAddress(value.Address.GetAddressBytes());
-				(socketArgs.RemoteEndPoint as IPEndPoint).Port = value.Port;
+				if ((socketArgs.RemoteEndPoint as IPEndPoint).Equals(value) == false)
+				{
+					(socketArgs.RemoteEndPoint as IPEndPoint).Address = new IPAddress(value.Address.GetAddressBytes());
+					(socketArgs.RemoteEndPoint as IPEndPoint).Port = value.Port;
+				}
 			}
 		}
 
@@ -106,9 +141,16 @@ namespace SocketServers
 
 		#region Buffer functions
 
-		/// <summary>
-		/// Gets the data buffer to use with an asynchronous socket method.
-		/// </summary>
+		public int OffsetOffset
+		{
+			get { return socketArgs.Offset - segment.Offset; }
+		}
+
+		public int Offset
+		{
+			get { return socketArgs.Offset; }
+		}
+
 		public byte[] Buffer
 		{
 			get { return socketArgs.Buffer; }
@@ -116,120 +158,85 @@ namespace SocketServers
 
 		public int BufferCapacity
 		{
-			get { return (socketArgs.Buffer != null) ? socketArgs.Buffer.Length : defaultSize; }
+			get { return (segment.IsValid()) ? segment.Count : defaultSize; }
 		}
 
-		/// <summary>
-		/// Gets the offset, in bytes, into the data buffer referenced by the Buffer property.
-		/// </summary>
-		public int Offset
+		public int Count
 		{
-			get;
-			private set;
+			get { return socketArgs.Count; }
 		}
 
-		/// <summary>
-		/// Gets the number of total bytes transferred in a continue socket operations.
-		/// </summary>
 		public int BytesTransferred
 		{
-			get { return socketArgs.Offset - Offset + socketArgs.BytesTransferred; }
+			get { return socketArgs.BytesTransferred + emulatedBytesTransfred; }
 		}
 
-		/// <summary>
-		/// Sets the data buffer to use with an asynchronous socket method.
-		/// </summary>
-		public void SetMaxBuffer()
+		public void SetBufferMax()
 		{
 			SetBuffer(0, BufferCapacity);
 		}
 
-		/// <summary>
-		/// == SetBuffer(Offset, BytesTransferred)
-		/// </summary>
-		/// <param name="length"></param>
-		public void SetBuffer()
+		public void SetBufferMax(int offsetOffset)
 		{
-			SetBuffer(Offset, BytesTransferred);
+			SetBuffer(offsetOffset, BufferCapacity - offsetOffset);
 		}
 
-		/// <summary>
-		/// == SetBuffer(e.Offset, length)
-		/// </summary>
-		/// <param name="length"></param>
-		public void SetBuffer(int length)
+		public void SetBuffer(int offsetOffset, int count)
 		{
-			SetBuffer(Offset, length);
-		}
+			emulatedBytesTransfred = 0;
 
-		/// <summary>
-		/// Sets the data buffer to use with an asynchronous socket method.
-		/// </summary>
-		/// <param name="offset"></param>
-		/// <param name="length"></param>
-		public void SetBuffer(int offset, int length)
-		{
-			Offset = offset;
-
-			if (socketArgs.Buffer != null && (offset + length) <= socketArgs.Buffer.Length)
-				socketArgs.SetBuffer(offset, length);
-			else
-				socketArgs.SetBuffer(NewBuffer(offset + length), offset, length);
-		}
-
-		/// <summary>
-		/// Extend buffer size for socket operations.
-		/// </summary>
-		/// <param name="newLength"></param>
-		public void ContinueBuffer(int newLength)
-		{
-			int newBufferLength = Offset + newLength;
-
-			if (newBufferLength <= socketArgs.Buffer.Length)
-				socketArgs.SetBuffer(ContinueOffset, newLength - BytesTransferred);
+			if (socketArgs.Buffer != null && (offsetOffset + count) <= segment.Count)
+				socketArgs.SetBuffer(segment.Offset + offsetOffset, count);
 			else
 			{
-				byte[] newBuffer = NewBuffer(newBufferLength);
-				Array.Copy(socketArgs.Buffer, newBuffer, socketArgs.Buffer.Length);
+				BufferManager.Free(ref segment);
+				segment = BufferManager.Allocate(offsetOffset + count);
 
-				socketArgs.SetBuffer(newBuffer, ContinueOffset, newLength - BytesTransferred);
+				socketArgs.SetBuffer(segment.Array, segment.Offset + offsetOffset, count);
 			}
 		}
 
-		/// <summary>
-		/// Prepare buffer for next operation if not all expected data was receieved.
-		/// </summary>
-		/// <returns>False when all data received</returns>
-		public bool ContinueBuffer()
+		public void ResizeBufferCount(int offset, int count)
 		{
-			if (socketArgs.BytesTransferred < socketArgs.Count)
+			if (offset < segment.Offset)
+				throw new ArgumentOutOfRangeException(@"offset");
+
+			int offsetOffset = offset - segment.Offset;
+
+			if ((offsetOffset + count) > segment.Count)
 			{
-				socketArgs.SetBuffer(ContinueOffset, socketArgs.Count - socketArgs.BytesTransferred);
-				return true;
+				var segment2 = BufferManager.Allocate(offsetOffset + count);
+
+				System.Buffer.BlockCopy(segment.Array, 0, segment2.Array, 0, segment.Count);
+
+				BufferManager.Free(ref segment);
+				segment = segment2;
+
+				socketArgs.SetBuffer(segment.Array, segment.Offset + offsetOffset, count);
 			}
-
-			return false;
+			else
+			{
+				socketArgs.SetBuffer(segment.Offset + offsetOffset, count);
+			}
 		}
 
-		private int ContinueOffset
+		public void ResizeBufferTransfered(int offset, int bytesTransfred)
 		{
-			get { return socketArgs.Offset + socketArgs.BytesTransferred; }
+			if (offset < segment.Offset)
+				throw new ArgumentOutOfRangeException(@"offset");
+
+			socketArgs.SetBuffer(offset, socketArgs.Count);
+			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
 
-		private byte[] NewBuffer(int length)
+		public void EmulateTransfer(ArraySegment<byte> newSegment, int offset, int bytesTransfred)
 		{
-			return new byte[GetBufferSize(length)];
-		}
+			BufferManager.Free(ref segment);
 
+			segment = newSegment;
+			socketArgs.SetBuffer(segment.Array, offset, segment.Count + offset - segment.Offset);
 
-		internal static int defaultSize = 4096;
-
-		public int GetBufferSize(int requredSize)
-		{
-			if (defaultSize < requredSize)
-				defaultSize = requredSize + 1024 - requredSize % 1024;
-
-			return defaultSize;
+			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
 
 		#endregion

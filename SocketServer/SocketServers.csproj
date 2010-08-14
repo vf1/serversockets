@@ -21,6 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,6 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -37,11 +39,16 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseTcpServer.cs" />
+    <Compile Include="BufferManager.cs" />
+    <Compile Include="ByteArraySegmentHelpers.cs" />
+    <Compile Include="SmartBufferPool.cs" />
     <Compile Include="BuffersPool.cs" />
     <Compile Include="Global.cs" />
     <Compile Include="ProtocolPort.cs" />
     <Compile Include="SafeDictionary.cs" />
     <Compile Include="SafeStack.cs" />
+    <Compile Include="Secur32.cs" />
     <Compile Include="Server.Connection.cs" />
     <Compile Include="ServerAsyncEventArgs.cs" />
     <Compile Include="ServerChangeEventArgs.cs" />
@@ -53,6 +60,8 @@
     <Compile Include="ServersManager.EndpointInfo.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="SocketEx.cs" />
+    <Compile Include="SpinLock.cs" />
+    <Compile Include="SspiContext.cs" />
     <Compile Include="TcpServer.cs" />
     <Compile Include="SspiTlsServer.cs" />
     <Compile Include="UdpServer.cs" />

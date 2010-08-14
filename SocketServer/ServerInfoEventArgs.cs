@@ -6,22 +6,33 @@ namespace SocketServers
 	public class ServerInfoEventArgs
 		: ServerChangeEventArgs
 	{
-		public ServerInfoEventArgs(ServerEndPoint serverEndPoint, SocketError error)
+		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, SocketError error)
 			: base(serverEndPoint)
 		{
 			SocketError = error;
 		}
 
-		public ServerInfoEventArgs(ServerEndPoint serverEndPoint, Exception error)
+		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, Exception error)
 			: base(serverEndPoint)
 		{
 			Exception = error;
 		}
 
-		public ServerInfoEventArgs(ServerEndPoint serverEndPoint, string error)
+		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, string error)
 			: base(serverEndPoint)
 		{
 			Error = error;
+		}
+
+		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, string api, string function, uint error)
+			: base(serverEndPoint)
+		{
+			Error = Format(api, function, error);
+		}
+
+		internal static string Format(string api, string function, uint error)
+		{
+			return string.Format(@"{0} error, function call {1} return 0x{2:x8}", api, function, error);
 		}
 
 		public SocketError SocketError { get; private set; }

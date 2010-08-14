@@ -9,29 +9,35 @@ using System.Threading;
 namespace SocketServers
 {
 	class SafeDictionary<K, T>
-		where T : class
 	{
-		private object sync;
-		private Int32 readerSync;
+		private ReaderWriterLockSlim sync;
 		private Dictionary<K, T> dictionary;
 
 		public SafeDictionary()
+			: this(-1)
 		{
-			sync = new object();
-			readerSync = 0;
-			dictionary = new Dictionary<K, T>();
+		}
+
+		public SafeDictionary(int capacity)
+		{
+			sync = new ReaderWriterLockSlim();
+
+			if (capacity > 0)
+				dictionary = new Dictionary<K, T>(capacity);
+			else
+				dictionary = new Dictionary<K, T>();
 		}
 
 		public void Clear()
 		{
 			try
 			{
-				WriterIn();
+				sync.EnterWriteLock();
 				dictionary.Clear();
 			}
 			finally
 			{
-				WriterOut();
+				sync.ExitWriteLock();
 			}
 		}
 
@@ -39,12 +45,12 @@ namespace SocketServers
 		{
 			try
 			{
-				WriterIn();
+				sync.EnterWriteLock();
 				dictionary.Add(key, value);
 			}
 			finally
 			{
-				WriterOut();
+				sync.ExitWriteLock();
 			}
 		}
 
@@ -53,12 +59,12 @@ namespace SocketServers
 			bool result;
 			try
 			{
-				WriterIn();
+				sync.EnterWriteLock();
 				result = dictionary.Remove(key);
 			}
 			finally
 			{
-				WriterOut();
+				sync.ExitWriteLock();
 			}
 
 			return result;
@@ -68,13 +74,13 @@ namespace SocketServers
 		{
 			try
 			{
-				ReaderIn();
+				sync.EnterReadLock();
 				foreach (var pair in dictionary)
 					action(pair.Value);
 			}
 			finally
 			{
-				ReaderOut();
+				sync.ExitReadLock();
 			}
 		}
 
@@ -82,7 +88,7 @@ namespace SocketServers
 		{
 			try
 			{
-				WriterIn();
+				sync.EnterWriteLock();
 
 				List<K> keys = new List<K>();
 				foreach (var pair in dictionary)
@@ -97,7 +103,7 @@ namespace SocketServers
 			}
 			finally
 			{
-				WriterOut();
+				sync.ExitWriteLock();
 			}
 		}
 
@@ -107,12 +113,12 @@ namespace SocketServers
 
 			try
 			{
-				ReaderIn();
+				sync.EnterReadLock();
 				result = dictionary.TryGetValue(key, out value);
 			}
 			finally
 			{
-				ReaderOut();
+				sync.ExitReadLock();
 			}
 
 			return result;
@@ -123,12 +129,12 @@ namespace SocketServers
 			T value;
 			try
 			{
-				ReaderIn();
+				sync.EnterReadLock();
 				dictionary.TryGetValue(key, out value);
 			}
 			finally
 			{
-				ReaderOut();
+				sync.ExitReadLock();
 			}
 
 			return value;
@@ -139,66 +145,15 @@ namespace SocketServers
 			bool result;
 			try
 			{
-				ReaderIn();
+				sync.EnterReadLock();
 				result = dictionary.ContainsKey(key);
 			}
 			finally
 			{
-				ReaderOut();
+				sync.ExitReadLock();
 			}
 
 			return result;
 		}
-
-		#region Synchronization
-
-		private void ReaderIn()
-		{
-			bool locked = false;
-
-			Int32 readerSync1;
-			do
-			{
-				do
-				{
-					readerSync1 = readerSync;
-					if (readerSync1 < 0)
-					{
-						if (locked == false)
-						{
-							Monitor.Enter(sync);
-							locked = true;
-						}
-						readerSync1 = readerSync;
-					}
-				}
-				while (readerSync1 < 0);
-			}
-			while (Interlocked.CompareExchange(ref readerSync, readerSync1 + 1, readerSync1) != readerSync1);
-
-			if (locked)
-				Monitor.Exit(sync);
-		}
-
-		private void ReaderOut()
-		{
-			Interlocked.Decrement(ref readerSync);
-		}
-
-		private void WriterIn()
-		{
-			Monitor.Enter(sync);
-
-			while (Interlocked.CompareExchange(ref readerSync, -1, 0) != 0) ;
-		}
-
-		private void WriterOut()
-		{
-			Interlocked.Exchange(ref readerSync, 0);
-
-			Monitor.Exit(sync);
-		}
-
-		#endregion
 	}
 }

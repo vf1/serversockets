@@ -17,7 +17,7 @@ namespace SocketServers
 	/// Lock-free array based stack
 	/// </summary>
 	/// <typeparam name="T">Type of items</typeparam>
-	class SafeStack<T> where T : class
+	class SafeStack<T>// where T : class
 	{
 		private Int64 head;
 		private SafeStackItem<T>[] array;

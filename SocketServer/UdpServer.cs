@@ -103,7 +103,7 @@ namespace SocketServers
 		{
 			e.Completed = ReceiveFrom_Completed;
 			e.SetAnyRemote(realEndPoint.AddressFamily);
-			e.SetMaxBuffer();
+			e.SetBufferMax();
 		}
 	}
 }

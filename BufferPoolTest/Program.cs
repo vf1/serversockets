@@ -101,7 +101,7 @@ namespace BufferPoolTest
 		}
 	}
 
-	class Item: IBuffersPoolItem
+	class Item : IBuffersPoolItem, IDisposable
 	{
 		public static int count = -1;
 		public int Index;
@@ -113,6 +113,10 @@ namespace BufferPoolTest
 		}
 
 		void IBuffersPoolItem.SetDefaultValues()
+		{
+		}
+
+		void IDisposable.Dispose()
 		{
 		}
 	}

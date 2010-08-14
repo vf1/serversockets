@@ -6,6 +6,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using SocketServers;
+using System.Security.Cryptography.X509Certificates;
 
 namespace EchoServer
 {
@@ -33,11 +34,15 @@ namespace EchoServer
 				}
 			}
 
+			Console.Write(@"Load certificate...");
+			var certificate = new X509Certificate2("SocketServers.pfx");
+			Console.WriteLine(@"Ok");
+
 			Console.Write(@"Initialize...");
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager(256, new ServersManagerConfig() { TcpInitialBufferSize = 128, TcpInitialOffset = 256, });
+			var serversManager = new ServersManager(2048, new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{
@@ -47,12 +52,14 @@ namespace EchoServer
 				};
 			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = serverPort, });
 			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Udp, Port = serverPort, });
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tls, Port = serverPort + 1, });
 			serversManager.ServerAdded += ServersManager_ServerAdded;
 			serversManager.ServerRemoved += ServersManager_ServerRemoved;
 			serversManager.ServerInfo += ServersManager_ServerInfo;
 			serversManager.Received += ServersManager_Received;
 			serversManager.Sent += ServersManager_Sent;
 			serversManager.NewConnection += ServersManager_NewConnection;
+			serversManager.EndConnection += ServersManager_EndConnection;
 
 			Console.WriteLine(@"Ok");
 
@@ -104,6 +111,7 @@ namespace EchoServer
 			serversManager.Received -= ServersManager_Received;
 			serversManager.Sent -= ServersManager_Sent;
 			serversManager.NewConnection -= ServersManager_NewConnection;
+			serversManager.EndConnection -= ServersManager_EndConnection;
 
 			/////////////////////////////////////////////////////////////////////////
 
@@ -118,28 +126,9 @@ namespace EchoServer
 
 		static bool ServersManager_Received(ServersManager server, ref ServerAsyncEventArgs e)
 		{
-			if (e.LocalEndPoint.Protocol == ServerIpProtocol.Udp)
-			{
-				e.SetBuffer(e.Offset, e.BytesTransferred);
-				server.SendAsync(e);
-				e = null;
-			}
-			else
-			{
-				if (e.ContinueBuffer() == false)
-				{
-					if (e.BytesTransferred < 3072)
-					{
-						e.ContinueBuffer(3072);
-					}
-					else
-					{
-						e.SetBuffer(e.Offset, e.BytesTransferred);
-						server.SendAsync(e);
-						e = null;
-					}
-				}
-			}
+			e.SetBuffer(e.OffsetOffset, e.BytesTransferred);
+			server.SendAsync(e);
+			e = null;
 
 			return true;
 		}
@@ -166,6 +155,11 @@ namespace EchoServer
 		static void ServersManager_NewConnection(ServersManager s, ServerConnectionEventArgs e)
 		{
 			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.LocalEndPoint.ToString(), e.ConnectionId);
+		}
+
+		static void ServersManager_EndConnection(ServersManager s, ServerConnectionEventArgs e)
+		{
+			Console.WriteLine(@"  -    -    End Connection: ID: {0}", e.ConnectionId);
 		}
 	}
 }
