@@ -178,11 +178,20 @@ namespace SocketServers
 
 		public void SetBufferMax(int offsetOffset)
 		{
+#if DEBUG
+			if (offsetOffset >= BufferCapacity)
+				throw new ArgumentOutOfRangeException(@"SetBuffer offsetOffset <= BufferCapacity");
+#endif
 			SetBuffer(offsetOffset, BufferCapacity - offsetOffset);
 		}
 
 		public void SetBuffer(int offsetOffset, int count)
 		{
+#if DEBUG
+			if (count <= 0)
+				throw new ArgumentOutOfRangeException(@"SetBuffer count <= 0");
+#endif
+
 			emulatedBytesTransfred = 0;
 
 			if (socketArgs.Buffer != null && (offsetOffset + count) <= segment.Count)

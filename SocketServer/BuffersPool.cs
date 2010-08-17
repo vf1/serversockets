@@ -41,6 +41,8 @@ namespace SocketServers
 			else
 			{
 				result = new T();
+				result.SetDefaultValues();
+
 				Interlocked.Increment(ref created);
 			}
 
