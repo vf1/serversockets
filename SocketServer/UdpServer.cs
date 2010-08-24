@@ -12,6 +12,12 @@ namespace SocketServers
 	class UdpServer
 		: Server
 	{
+
+//		private const uint IOC_IN = 0x80000000;
+//		private const uint IOC_VENDOR = 0x18000000;
+//		private const uint SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12; 
+		private const int SIO_UDP_CONNRESET = -1744830452; // 0x9800000C
+
 		private object sync;
 		private Socket socket;
 		private int queueSize;
@@ -32,6 +38,9 @@ namespace SocketServers
 
 				socket = new Socket(realEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 				socket.Bind(realEndPoint);
+
+				// http://support.microsoft.com/kb/263823/en-us
+				socket.IOControl(SIO_UDP_CONNRESET, new byte[4], null);
 
 				ThreadPool.QueueUserWorkItem(new WaitCallback(EnqueueBuffers), queueSize);
 			}

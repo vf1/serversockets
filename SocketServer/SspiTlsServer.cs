@@ -348,11 +348,14 @@ namespace SocketServers
 					if (result == SecurityStatus.SEC_I_CONTINUE_NEEDED || result == SecurityStatus.SEC_E_OK ||
 						(Sspi.Failed(result) && (contextAttr & (int)ContextAttr.ASC_RET_EXTENDED_ERROR) != 0))
 					{
-						oe.SetBuffer(0, output.Buffers[0].Size);
-						oe.CopyAddressesFrom(ie);
+						if (output.Buffers[0].Size > 0)
+						{
+							oe.SetBuffer(0, output.Buffers[0].Size);
+							oe.CopyAddressesFrom(ie);
 
-						base.SendAsync(oe);
-						oe = null;
+							base.SendAsync(oe);
+							oe = null;
+						}
 					}
 
 
