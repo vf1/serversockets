@@ -12,10 +12,6 @@ namespace SocketServers
 	class UdpServer
 		: Server
 	{
-
-//		private const uint IOC_IN = 0x80000000;
-//		private const uint IOC_VENDOR = 0x18000000;
-//		private const uint SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12; 
 		private const int SIO_UDP_CONNRESET = -1744830452; // 0x9800000C
 
 		private object sync;
