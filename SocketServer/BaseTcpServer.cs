@@ -90,7 +90,7 @@ namespace SocketServers
 
 					connection.Dispose(buffersPool);
 
-					OnEndConnection(connection.Id);
+					OnEndTcpConnection(connection);
 					connection = null;
 				}
 			}
@@ -209,7 +209,7 @@ namespace SocketServers
 		}
 
 		protected abstract void OnNewTcpConnection(Connection connection);
-		protected abstract void OnEndTcpConnection(int connectionId);
+		protected abstract void OnEndTcpConnection(Connection connection);
 		protected abstract bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e);
 
 		private void BeginReceive(Connection connection)
@@ -265,7 +265,7 @@ namespace SocketServers
 
 							connections.Remove(socket.RemoteEndPoint);
 							connection.Dispose(buffersPool);
-							OnEndTcpConnection(connection.Id);
+							OnEndTcpConnection(connection);
 
 							break;
 						}

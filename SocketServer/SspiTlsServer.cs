@@ -108,9 +108,13 @@ namespace SocketServers
 			connection.SspiContext.Connected = false;
 		}
 
-		protected override void OnEndTcpConnection(int connectionId)
+		protected override void OnEndTcpConnection(Connection connection)
 		{
-			OnEndConnection(connectionId);
+			if (connection.SspiContext.Connected)
+			{
+				connection.SspiContext.Connected = false;
+				OnEndConnection(connection.Id);
+			}
 		}
 
 		protected override bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e)

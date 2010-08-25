@@ -23,9 +23,9 @@ namespace SocketServers
 			OnNewConnection(connection);
 		}
 
-		protected override void OnEndTcpConnection(int connectionId)
+		protected override void OnEndTcpConnection(Connection connection)
 		{
-			OnEndConnection(connectionId);
+			OnEndConnection(connection.Id);
 		}
 
 		protected override bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e)
