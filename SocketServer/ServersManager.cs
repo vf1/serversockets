@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
+using System.Security.Cryptography.X509Certificates;
 
 namespace SocketServers
 {
@@ -165,6 +166,27 @@ namespace SocketServers
 			{
 				eventArgs.SocketError = SocketError.NetworkDown;
 				Server_Sent(null, eventArgs);
+			}
+		}
+
+		public X509Certificate2 FindCertificateInStore(string thumbprint)
+		{
+			X509Store store = null;
+			try
+			{
+				store = new X509Store(StoreLocation.LocalMachine);
+
+				var found = store.Certificates.Find(X509FindType.FindByThumbprint, thumbprint, false);
+
+				if (found.Count > 0)
+					return found[0];
+
+				return null;
+			}
+			finally
+			{
+				if (store != null)
+					store.Close();
 			}
 		}
 
