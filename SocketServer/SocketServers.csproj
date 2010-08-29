@@ -39,6 +39,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseConnection.cs" />
     <Compile Include="BaseTcpServer.cs" />
     <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArraySegmentHelpers.cs" />
@@ -52,7 +53,6 @@
     <Compile Include="Server.Connection.cs" />
     <Compile Include="ServerAsyncEventArgs.cs" />
     <Compile Include="ServerChangeEventArgs.cs" />
-    <Compile Include="ServerConnectionEventArgs.cs" />
     <Compile Include="ServerEndPoint.cs" />
     <Compile Include="ServerInfoEventArgs.cs" />
     <Compile Include="ServersManagerConfig.cs" />
@@ -62,6 +62,7 @@
     <Compile Include="SocketEx.cs" />
     <Compile Include="SpinLock.cs" />
     <Compile Include="SspiContext.cs" />
+    <Compile Include="StreamBuffer.cs" />
     <Compile Include="TcpServer.cs" />
     <Compile Include="SspiTlsServer.cs" />
     <Compile Include="UdpServer.cs" />

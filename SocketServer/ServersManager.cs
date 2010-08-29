@@ -12,13 +12,14 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace SocketServers
 {
-	public partial class ServersManager
+	public partial class ServersManager<C>
 		: IDisposable
+		where C : BaseConnection, new()
 	{
 		private object sync;
 		private bool running;
-		private SafeDictionary<ServerEndPoint, Server> servers;
-		private SafeDictionary<ServerEndPoint, Server> fakeServers;
+		private SafeDictionary<ServerEndPoint, Server<C>> servers;
+		private SafeDictionary<ServerEndPoint, Server<C>> fakeServers;
 		private List<ProtocolPort> protocolPorts;
 		private BuffersPool<ServerAsyncEventArgs> buffersPool;
 		private List<UnicastIPAddressInformation> networkAddressInfos;
@@ -36,12 +37,12 @@ namespace SocketServers
 
 			this.sync = new object();
 			this.protocolPorts = new List<ProtocolPort>();
-			this.servers = new SafeDictionary<ServerEndPoint, Server>();
-			this.fakeServers = new SafeDictionary<ServerEndPoint, Server>();
+			this.servers = new SafeDictionary<ServerEndPoint, Server<C>>();
+			this.fakeServers = new SafeDictionary<ServerEndPoint, Server<C>>();
 
 			this.AddressPredicate = DefaultAddressPredicate;
 			this.FakeAddressAction = DefaultFakeAddressAction;
-	
+
 			this.buffersPool = buffersPool;
 			this.config = config;
 
@@ -51,10 +52,10 @@ namespace SocketServers
 		public event EventHandler<ServerChangeEventArgs> ServerRemoved;
 		public event EventHandler<ServerChangeEventArgs> ServerAdded;
 		public event EventHandler<ServerInfoEventArgs> ServerInfo;
-		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs, bool> Received;
-		public event ServerEventHandlerRef<ServersManager, ServerAsyncEventArgs> Sent;
-		public event ServerEventHandlerVal<ServersManager, ServerConnectionEventArgs> NewConnection;
-		public event ServerEventHandlerVal<ServersManager, ServerConnectionEventArgs> EndConnection;
+		public event ServerEventHandlerRef<ServersManager<C>, C, ServerAsyncEventArgs, bool> Received;
+		public event ServerEventHandlerRef<ServersManager<C>, ServerAsyncEventArgs> Sent;
+		public event ServerEventHandlerVal<ServersManager<C>, BaseConnection> NewConnection;
+		public event ServerEventHandlerVal<ServersManager<C>, BaseConnection> EndConnection;
 
 		private static bool DefaultAddressPredicate(NetworkInterface interface1, IPInterfaceProperties properties, UnicastIPAddressInformation addrInfo)
 		{
@@ -258,7 +259,7 @@ namespace SocketServers
 		private SocketError AddServers(IEnumerable<EndpointInfo> infos, bool ignoreErrors)
 		{
 			SocketError error = SocketError.Success;
-			List<Server> created = new List<Server>();
+			List<Server<C>> created = new List<Server<C>>();
 
 			foreach (var info in infos)
 			{
@@ -271,7 +272,7 @@ namespace SocketServers
 							fakeEndpoint = FakeAddressAction(info.ServerEndPoint);
 					}
 
-					var server = Server.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, buffersPool, config);
+					var server = Server<C>.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, buffersPool, config);
 					server.Received = Server_Received;
 					server.Sent = Server_Sent;
 					server.Failed = Server_Failed;
@@ -317,14 +318,14 @@ namespace SocketServers
 			return error;
 		}
 
-		private bool Server_Received(Server server, ref ServerAsyncEventArgs e)
+		private bool Server_Received(Server<C> server, C c, ref ServerAsyncEventArgs e)
 		{
 			if (Received != null)
-				return Received(this, ref e);
+				return Received(this, c, ref e);
 			return false;
 		}
 
-		private void Server_Sent(Server server, ServerAsyncEventArgs e)
+		private void Server_Sent(Server<C> server, ServerAsyncEventArgs e)
 		{
 			if (Sent != null)
 				Sent(this, ref e);
@@ -333,26 +334,26 @@ namespace SocketServers
 				buffersPool.Put(e);
 		}
 
-		private void Server_Failed(Server server, ServerInfoEventArgs e)
+		private void Server_Failed(Server<C> server, ServerInfoEventArgs e)
 		{
 			servers.Remove(server.LocalEndPoint);
 			OnServerRemoved(server);
 			OnServerInfo(e);
 		}
 
-		private void Server_NewConnection(Server server, ServerConnectionEventArgs e)
+		private void Server_NewConnection(Server<C> server, BaseConnection e)
 		{
 			if (NewConnection != null)
 				NewConnection(this, e);
 		}
 
-		private void Server_EndConnection(Server server, ServerConnectionEventArgs e)
+		private void Server_EndConnection(Server<C> server, BaseConnection e)
 		{
 			if (EndConnection != null)
 				EndConnection(this, e);
 		}
 
-		private void OnServerAdded(Server server)
+		private void OnServerAdded(Server<C> server)
 		{
 			if (server.FakeEndPoint != null)
 			{
@@ -365,7 +366,7 @@ namespace SocketServers
 				ServerAdded(this, new ServerChangeEventArgs(server.LocalEndPoint));
 		}
 
-		private void OnServerRemoved(Server server)
+		private void OnServerRemoved(Server<C> server)
 		{
 			server.Dispose();
 

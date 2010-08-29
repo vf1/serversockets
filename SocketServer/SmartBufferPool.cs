@@ -26,8 +26,8 @@ namespace SocketServers
 		public readonly int ExtraMemoryUsage;
 		public readonly int MaxBuffersCount;
 
-		private const int MinSize = 1 * Kb;
-		private const int MaxSize = 256 * Kb;
+		public const int MinSize = 1 * Kb;
+		public const int MaxSize = 256 * Kb;
 
 		private byte[][] buffers;
 		private long indexOffset;

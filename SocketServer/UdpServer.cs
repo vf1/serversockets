@@ -9,8 +9,9 @@ using System.Threading;
 
 namespace SocketServers
 {
-	class UdpServer
-		: Server
+	class UdpServer<C>
+		: Server<C>
+		where C : BaseConnection, new()
 	{
 		private const int SIO_UDP_CONNRESET = -1744830452; // 0x9800000C
 
@@ -82,7 +83,7 @@ namespace SocketServers
 			while (isRunning)
 			{
 				if (e.SocketError == SocketError.Success)
-					OnReceived(ref e);
+					OnReceived(null, ref e);
 				else
 				{
 					if (isRunning)

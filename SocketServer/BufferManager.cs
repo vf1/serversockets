@@ -22,5 +22,10 @@ namespace SocketServers
 				manager.Free(segment);
 			segment = new ArraySegment<byte>();
 		}
+
+		public static int MaxSize
+		{
+			get { return SmartBufferPool.MaxSize; }
+		}
 	}
 }

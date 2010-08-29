@@ -14,8 +14,9 @@ using System.Runtime.InteropServices;
 
 namespace SocketServers
 {
-	class SspiTlsServer
-		: BaseTcpServer
+	class SspiTlsServer<C>
+		: BaseTcpServer<C>
+		where C : BaseConnection, new()
 	{
 		// http://www.codeproject.com/KB/IP/sslclasses.aspx
 
@@ -103,21 +104,22 @@ namespace SocketServers
 			}
 		}
 
-		protected override void OnNewTcpConnection(Connection connection)
+		protected override void OnNewTcpConnection(Connection<C> connection)
 		{
 			connection.SspiContext.Connected = false;
+			connection.SspiContext.Buffer.Resize(maxTokenSize);
 		}
 
-		protected override void OnEndTcpConnection(Connection connection)
+		protected override void OnEndTcpConnection(Connection<C> connection)
 		{
 			if (connection.SspiContext.Connected)
 			{
 				connection.SspiContext.Connected = false;
-				OnEndConnection(connection.Id);
+				OnEndConnection(connection);
 			}
 		}
 
-		protected override bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e)
+		protected override bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e)
 		{
 			bool result;
 			bool oldConnected = connection.SspiContext.Connected;
@@ -144,13 +146,14 @@ namespace SocketServers
 			return result;
 		}
 
-		unsafe private bool DecryptData(ref ServerAsyncEventArgs e, Connection connection)
+		unsafe private bool DecryptData(ref ServerAsyncEventArgs e, Connection<C> connection)
 		{
 			var context = connection.SspiContext;
 			var message = context.SecBufferDesc5;
 
 			if (context.Buffer.IsValid() && e != null)
-				context.CopyToBuffer(e, 0);
+				if (context.Buffer.CopyTransferredFrom(e, 0) == false)
+					return false;
 
 			for (; ; )
 			{
@@ -188,20 +191,22 @@ namespace SocketServers
 							if (context.Buffer.IsInvalid())
 							{
 								if (extraIndex >= 0)
-									context.CopyToBuffer(message.Buffers[extraIndex]);
+									if (context.Buffer.CopyFrom(message.Buffers[extraIndex]) == false)
+										return false;
 
 								e.ResizeBufferTransfered(message.Buffers[dataIndex].Offset,
 									message.Buffers[dataIndex].Size);
 
-								if (OnReceived(ref e) == false)
+								if (OnReceived(connection, ref e) == false)
 									return false;
 							}
 							else
 							{
-								var buffer = context.DetachBuffer();
+								var buffer = context.Buffer.Detach();
 
 								if (extraIndex >= 0)
-									context.CopyToBuffer(message.Buffers[extraIndex]);
+									if (context.Buffer.CopyFrom(message.Buffers[extraIndex]) == false)
+										return false;
 
 
 								// create eventarg and call onreceived event
@@ -213,7 +218,7 @@ namespace SocketServers
 								e2.EmulateTransfer(buffer, message.Buffers[dataIndex].Offset,
 									message.Buffers[dataIndex].Size);
 
-								bool continue1 = OnReceived(ref e2);
+								bool continue1 = OnReceived(connection, ref e2);
 
 								if (e2 != null)
 									buffersPool.Put(e2);
@@ -234,7 +239,8 @@ namespace SocketServers
 					case SecurityStatus.SEC_E_INCOMPLETE_MESSAGE:
 
 						if (context.Buffer.IsInvalid())
-							context.CopyToBuffer(e, 0);
+							if (context.Buffer.CopyTransferredFrom(e, 0) == false)
+								return false;
 
 						return true;
 
@@ -256,27 +262,26 @@ namespace SocketServers
 			}
 		}
 
-		private unsafe bool Handshake(ServerAsyncEventArgs ie, Connection connection)
+		private unsafe bool Handshake(ServerAsyncEventArgs ie, Connection<C> connection)
 		{
 			int contextAttr = 0;
 			ServerAsyncEventArgs oe = null;
-			SspiContext context = connection.SspiContext;
+			var context = connection.SspiContext;
+			var input = context.SecBufferDesc2[0];
+			var output = context.SecBufferDesc2[1];
 
 			try
 			{
 				if (context.Buffer.IsValid() && ie != null)
-					context.CopyToBuffer(ie, 0);
+					if (context.Buffer.CopyTransferredFrom(ie, 0) == false)
+						return false;
 
 				for (; ; )
 				{
 					// prepare input buffer
 					//
-					var input = new SecBufferDescEx(
-						new SecBufferEx[]
-						{
-							new SecBufferEx() { BufferType = BufferType.SECBUFFER_TOKEN, },
-							new SecBufferEx() { BufferType = BufferType.SECBUFFER_EMPTY, },
-						});
+					input.Buffers[0].BufferType = BufferType.SECBUFFER_TOKEN;
+					input.Buffers[1].BufferType = BufferType.SECBUFFER_EMPTY;
 
 					if (context.Buffer.IsValid())
 						SetSecBuffer(context, ref input.Buffers[0]);
@@ -290,12 +295,11 @@ namespace SocketServers
 						oe = buffersPool.Get();
 					oe.SetBufferMax();
 
-					var output = new SecBufferDescEx(
-						new SecBufferEx[]
-						{
-							new SecBufferEx() { BufferType = BufferType.SECBUFFER_TOKEN, Size = oe.BufferCapacity, Buffer = oe.Buffer, Offset = oe.Offset, },
-							new SecBufferEx() { BufferType = BufferType.SECBUFFER_EMPTY, },
-						});
+					output.Buffers[0].BufferType = BufferType.SECBUFFER_TOKEN;
+					output.Buffers[0].Size = oe.BufferCapacity;
+					output.Buffers[0].Buffer = oe.Buffer;
+					output.Buffers[0].Offset = oe.Offset;
+					output.Buffers[1].BufferType = BufferType.SECBUFFER_EMPTY;
 
 
 					// prepare some args and call SSPI
@@ -332,7 +336,8 @@ namespace SocketServers
 						case SecurityStatus.SEC_E_INCOMPLETE_MESSAGE:
 
 							if (context.Buffer.IsInvalid())
-								context.CopyToBuffer(ie, 0);
+								if (context.Buffer.CopyTransferredFrom(ie, 0) == false)
+									return false;
 							return true;
 
 
@@ -369,22 +374,20 @@ namespace SocketServers
 
 					if (extraIndex < 0)
 					{
-						BufferManager.Free(ref context.Buffer);
+						context.Buffer.Free();
 					}
 					else
 					{
 						if (context.Buffer.IsInvalid())
 						{
-							context.CopyToBuffer(ie,
-							   ie.BytesTransferred - input.Buffers[extraIndex].Size);
+							if (context.Buffer.CopyTransferredFrom(ie,
+							   ie.BytesTransferred - input.Buffers[extraIndex].Size) == false)
+								return false;
 						}
 						else
 						{
-							Buffer.BlockCopy(context.Buffer.Array,
-								context.Buffer.Offset + context.BufferCount - input.Buffers[extraIndex].Size,
-								context.Buffer.Array, context.Buffer.Offset, input.Buffers[extraIndex].Size);
-
-							context.BufferCount = input.Buffers[extraIndex].Size;
+							context.Buffer.MoveToBegin(context.Buffer.Count - input.Buffers[extraIndex].Size,
+								input.Buffers[extraIndex].Size);
 						}
 					}
 
@@ -436,7 +439,7 @@ namespace SocketServers
 		{
 			secBuffer.Buffer = context.Buffer.Array;
 			secBuffer.Offset = context.Buffer.Offset;
-			secBuffer.Size = context.BufferCount;
+			secBuffer.Size = context.Buffer.Count;
 		}
 
 		private void GetMaxTokenSize()

@@ -8,18 +8,15 @@ using System.Threading;
 
 namespace SocketServers
 {
-	partial class Server
+	partial class Server<C>
+		where C : BaseConnection, new()
 	{
-		internal class Connection
+		internal class Connection<C2>
 			: IDisposable
+			where C2 : BaseConnection, new()
 		{
 			private static int connectionCount;
 			private SspiContext sspiContext;
-
-			public Connection(Socket socket)
-				: this(socket, 0)
-			{
-			}
 
 			public Connection(Socket socket, int receivedQueueSize)
 			{
@@ -39,13 +36,21 @@ namespace SocketServers
 			{
 				if (sspiContext != null)
 					sspiContext.Dispose();
+
+				if (UserConnection != null)
+					UserConnection.Dispose();
+
 				Socket.SafeShutdownClose();
+
+				if (UserConnection != null)
+					UserConnection.Dispose();
 			}
 
 			public readonly int Id;
 			public readonly Socket Socket;
 			public readonly SpinLock ReceiveSpinLock;
 			public readonly CyclicBuffer ReceiveQueue;
+			public C2 UserConnection;
 
 			public SspiContext SspiContext
 			{

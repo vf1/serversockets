@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace SocketServers
 {
-	public partial class ServersManager
+	public partial class ServersManager<C>
 	{
 		class EndpointInfo
 		{

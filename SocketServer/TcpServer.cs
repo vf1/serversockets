@@ -10,27 +10,28 @@ using System.Threading;
 
 namespace SocketServers
 {
-	class TcpServer
-		: BaseTcpServer
+	class TcpServer<C>
+		: BaseTcpServer<C>
+		where C : BaseConnection, new()
 	{
 		public TcpServer(ServersManagerConfig config)
 			: base(config)
 		{
 		}
 
-		protected override void OnNewTcpConnection(Connection connection)
+		protected override void OnNewTcpConnection(Connection<C> connection)
 		{
 			OnNewConnection(connection);
 		}
 
-		protected override void OnEndTcpConnection(Connection connection)
+		protected override void OnEndTcpConnection(Connection<C> connection)
 		{
-			OnEndConnection(connection.Id);
+			OnEndConnection(connection);
 		}
 
-		protected override bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e)
+		protected override bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e)
 		{
-			return OnReceived(ref e);
+			return OnReceived(connection, ref e);
 		}
 	}
 }

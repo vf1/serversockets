@@ -10,13 +10,14 @@ using System.Threading;
 
 namespace SocketServers
 {
-	abstract class BaseTcpServer
-		: Server
+	abstract class BaseTcpServer<C>
+		: Server<C>
+		where C : BaseConnection, new()
 	{
 		private object sync;
 		private Socket listener;
 		private SocketAsyncEventArgs[] acceptEventArgs;
-		private SafeDictionary<EndPoint, Connection> connections;
+		private SafeDictionary<EndPoint, Connection<C>> connections;
 		private int acceptQueueSize;
 		private int receiveQueueSize;
 		private int offsetOffset;
@@ -37,7 +38,7 @@ namespace SocketServers
 			{
 				isRunning = true;
 
-				connections = new SafeDictionary<EndPoint, Connection>();
+				connections = new SafeDictionary<EndPoint, Connection<C>>();
 
 				listener = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
@@ -78,9 +79,9 @@ namespace SocketServers
 			}
 		}
 
-		protected Connection GetTcpConnection(IPEndPoint remote)
+		protected Connection<C> GetTcpConnection(IPEndPoint remote)
 		{
-			Connection connection = null;
+			Connection<C> connection = null;
 
 			if (connections.TryGetValue(remote, out connection))
 			{
@@ -100,7 +101,7 @@ namespace SocketServers
 
 		public override void SendAsync(ServerAsyncEventArgs e)
 		{
-			Connection connection = GetTcpConnection(e.RemoteEndPoint);
+			var connection = GetTcpConnection(e.RemoteEndPoint);
 
 			if (connection == null)
 			{
@@ -139,11 +140,11 @@ namespace SocketServers
 		private void Connect_Completed(Socket socket1, ServerAsyncEventArgs e)
 		{
 			bool beginReceive = false;
-			Connection connection = null;
+			Connection<C> connection = null;
 
 			if (e.SocketError == SocketError.Success)
 			{
-				connection = new Connection(socket1, receiveQueueSize);
+				connection = new Connection<C>(socket1, receiveQueueSize);
 				connections.Add(e.RemoteEndPoint, connection);
 				beginReceive = true;
 			}
@@ -162,7 +163,7 @@ namespace SocketServers
 					{
 						if (e.SocketError == SocketError.Success)
 						{
-							connection = new Connection(socket1, receiveQueueSize);
+							connection = new Connection<C>(socket1, receiveQueueSize);
 							connections.Add(e.RemoteEndPoint, connection);
 							beginReceive = true;
 						}
@@ -194,7 +195,7 @@ namespace SocketServers
 			}
 			else
 			{
-				Connection connection = new Connection(acceptEventArgs.AcceptSocket, receiveQueueSize);
+				var connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
 
 				if (acceptEventArgs.SocketError == SocketError.Success)
 					connections.Add(connection.Socket.RemoteEndPoint, connection);
@@ -208,11 +209,11 @@ namespace SocketServers
 			}
 		}
 
-		protected abstract void OnNewTcpConnection(Connection connection);
-		protected abstract void OnEndTcpConnection(Connection connection);
-		protected abstract bool OnTcpReceived(Connection connection, ref ServerAsyncEventArgs e);
+		protected abstract void OnNewTcpConnection(Connection<C> connection);
+		protected abstract void OnEndTcpConnection(Connection<C> connection);
+		protected abstract bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e);
 
-		private void BeginReceive(Connection connection)
+		private void BeginReceive(Connection<C> connection)
 		{
 			OnNewTcpConnection(connection);
 
@@ -238,7 +239,7 @@ namespace SocketServers
 		{
 			try
 			{
-				Connection connection = null;
+				Connection<C> connection = null;
 				if (connections.TryGetValue(e.RemoteEndPoint, out connection)
 					&& connection.Socket == socket)
 				{
@@ -297,7 +298,7 @@ namespace SocketServers
 			}
 		}
 
-		private bool SyncReceiveAsync(Connection connection, ServerAsyncEventArgs e)
+		private bool SyncReceiveAsync(Connection<C> connection, ServerAsyncEventArgs e)
 		{
 			PrepareEventArgs(connection, e);
 
@@ -314,7 +315,7 @@ namespace SocketServers
 			}
 		}
 
-		protected void PrepareEventArgs(Connection connection, ServerAsyncEventArgs e)
+		protected void PrepareEventArgs(Connection<C> connection, ServerAsyncEventArgs e)
 		{
 			e.ConnectionId = connection.Id;
 			e.RemoteEndPoint = connection.Socket.RemoteEndPoint as IPEndPoint;

@@ -42,7 +42,7 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager(2048, new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
+			var serversManager = new ServersManager<BaseConnection>(2048, new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{
@@ -124,7 +124,7 @@ namespace EchoServer
 			}
 		}
 
-		static bool ServersManager_Received(ServersManager server, ref ServerAsyncEventArgs e)
+		static bool ServersManager_Received(ServersManager<BaseConnection> server, BaseConnection c, ref ServerAsyncEventArgs e)
 		{
 			e.SetBuffer(e.OffsetOffset, e.BytesTransferred);
 			server.SendAsync(e);
@@ -133,7 +133,7 @@ namespace EchoServer
 			return true;
 		}
 
-		static void ServersManager_Sent(ServersManager server, ref ServerAsyncEventArgs e)
+		static void ServersManager_Sent(ServersManager<BaseConnection> server, ref ServerAsyncEventArgs e)
 		{
 		}
 
@@ -152,14 +152,14 @@ namespace EchoServer
 			Console.WriteLine(@"  -    Info: [ {0} ] {1}", e.ServerEndPoint.ToString(), e.ToString());
 		}
 
-		static void ServersManager_NewConnection(ServersManager s, ServerConnectionEventArgs e)
+		static void ServersManager_NewConnection(ServersManager<BaseConnection> s, BaseConnection e)
 		{
-			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.LocalEndPoint.ToString(), e.ConnectionId);
+			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.LocalEndPoint.ToString(), e.Id);
 		}
 
-		static void ServersManager_EndConnection(ServersManager s, ServerConnectionEventArgs e)
+		static void ServersManager_EndConnection(ServersManager<BaseConnection> s, BaseConnection e)
 		{
-			Console.WriteLine(@"  -    -    End Connection: ID: {0}", e.ConnectionId);
+			Console.WriteLine(@"  -    -    End Connection: ID: {0}", e.Id);
 		}
 	}
 }

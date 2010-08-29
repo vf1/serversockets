@@ -9,8 +9,9 @@ using System.Collections.Generic;
 
 namespace SocketServers
 {
-	abstract partial class Server
+	abstract partial class Server<C>
 		: IDisposable
+		where C : BaseConnection, new()
 	{
 		protected bool isRunning;
 		protected BuffersPool<ServerAsyncEventArgs> buffersPool;
@@ -23,11 +24,11 @@ namespace SocketServers
 		{
 		}
 
-		public ServerEventHandlerVal<Server, ServerInfoEventArgs> Failed;
-		public ServerEventHandlerRef<Server, ServerAsyncEventArgs, bool> Received;
-		public ServerEventHandlerVal<Server, ServerAsyncEventArgs> Sent;
-		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> NewConnection;
-		public ServerEventHandlerVal<Server, ServerConnectionEventArgs> EndConnection;
+		public ServerEventHandlerVal<Server<C>, ServerInfoEventArgs> Failed;
+		public ServerEventHandlerRef<Server<C>, C, ServerAsyncEventArgs, bool> Received;
+		public ServerEventHandlerVal<Server<C>, ServerAsyncEventArgs> Sent;
+		public ServerEventHandlerVal<Server<C>, BaseConnection> NewConnection;
+		public ServerEventHandlerVal<Server<C>, BaseConnection> EndConnection;
 
 		public abstract void Start();
 		public abstract void Dispose();
@@ -49,12 +50,12 @@ namespace SocketServers
 				Sent(this, e);
 		}
 
-		protected virtual bool OnReceived(ref ServerAsyncEventArgs e)
+		protected virtual bool OnReceived(Connection<C> c, ref ServerAsyncEventArgs e)
 		{
 			if (Received != null)
 			{
 				e.LocalEndPoint = GetLocalEndpoint(e.RemoteEndPoint.Address);
-				return Received(this, ref e);
+				return Received(this, c != null ? c.UserConnection : null, ref e);
 			}
 
 			return false;
@@ -66,7 +67,7 @@ namespace SocketServers
 				Failed(this, e);
 		}
 
-		protected virtual void OnNewConnection(Connection connection)
+		protected virtual void OnNewConnection(Connection<C> connection)
 		{
 			if (NewConnection != null)
 			{
@@ -74,8 +75,14 @@ namespace SocketServers
 				{
 					IPEndPoint remote = connection.Socket.RemoteEndPoint as IPEndPoint;
 
-					NewConnection(this, new ServerConnectionEventArgs(
-						GetLocalEndpoint((remote as IPEndPoint).Address), remote as IPEndPoint, connection.Id));
+					connection.UserConnection = new C()
+					{
+						LocalEndPoint = GetLocalEndpoint((remote as IPEndPoint).Address),
+						RemoteEndPoint = remote as IPEndPoint,
+						Id = connection.Id,
+					};
+
+					NewConnection(this, connection.UserConnection);
 				}
 				catch (ObjectDisposedException)
 				{
@@ -84,24 +91,24 @@ namespace SocketServers
 			}
 		}
 
-		protected virtual void OnEndConnection(int connectionId)
+		protected virtual void OnEndConnection(Connection<C> connection)
 		{
 			if (EndConnection != null)
 			{
-				EndConnection(this, new ServerConnectionEventArgs(null, null, connectionId));
+				EndConnection(this, connection.UserConnection);
 			}
 		}
 
-		public static Server Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
+		public static Server<C> Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
 		{
-			Server server = null;
+			Server<C> server = null;
 
 			if (real.Protocol == ServerIpProtocol.Tcp)
-				server = new TcpServer(config);
+				server = new TcpServer<C>(config);
 			else if (real.Protocol == ServerIpProtocol.Udp)
-				server = new UdpServer(config);
+				server = new UdpServer<C>(config);
 			else if (real.Protocol == ServerIpProtocol.Tls)
-				server = new SspiTlsServer(config);
+				server = new SspiTlsServer<C>(config);
 			else
 				throw new InvalidOperationException(@"Protocol is not supported.");
 
