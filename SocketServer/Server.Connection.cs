@@ -13,7 +13,7 @@ namespace SocketServers
 	{
 		internal class Connection<C2>
 			: IDisposable
-			where C2 : BaseConnection, new()
+			where C2 : IDisposable
 		{
 			private static int connectionCount;
 			private SspiContext sspiContext;
