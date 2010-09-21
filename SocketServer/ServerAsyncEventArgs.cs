@@ -48,10 +48,7 @@ namespace SocketServers
 			emulatedBytesTransfred = 0;
 
 			if (segment.Array != null && segment.Count != defaultSize)
-			{
 				BufferManager.Free(ref segment);
-				segment = BufferManager.Allocate(defaultSize);
-			}
 		}
 
 		public void Dispose()
