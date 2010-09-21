@@ -14,7 +14,8 @@ namespace SocketServers
 
 		public void Dispose()
 		{
-			buffer.Dispose();
+			if (buffer != null)
+				buffer.Dispose();
 		}
 
 		public ServerEndPoint LocalEndPoint { get; internal set; }
