@@ -7,22 +7,18 @@ using System.Threading;
 
 namespace SocketServers
 {
-	struct SafeStackItem<T>
+	struct LockFreeStackItem<T>
 	{
 		public volatile Int32 Next;
 		public T Value;
 	}
 
-	/// <summary>
-	/// Lock-free array based stack
-	/// </summary>
-	/// <typeparam name="T">Type of items</typeparam>
-	class SafeStack<T>// where T : class
+	class LockFreeStack<T>
 	{
 		private Int64 head;
-		private SafeStackItem<T>[] array;
+		private LockFreeStackItem<T>[] array;
 
-		public SafeStack(SafeStackItem<T>[] array, Int32 pushFrom, Int32 pushCount)
+		public LockFreeStack(LockFreeStackItem<T>[] array, Int32 pushFrom, Int32 pushCount)
 		{
 			this.array = array;
 			head = pushFrom;

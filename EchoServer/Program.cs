@@ -42,7 +42,7 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager<BaseConnection>(2048, new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
+			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{
@@ -60,6 +60,9 @@ namespace EchoServer
 			serversManager.Sent += ServersManager_Sent;
 			serversManager.NewConnection += ServersManager_NewConnection;
 			serversManager.EndConnection += ServersManager_EndConnection;
+
+			//for (int i = 0; i < 10; i++)
+			//	serversManager.BuffersPool.Get();
 
 			Console.WriteLine(@"Ok");
 
@@ -115,7 +118,11 @@ namespace EchoServer
 
 			/////////////////////////////////////////////////////////////////////////
 
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+
 			System.Threading.Thread.Sleep(2000);
+
 			if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
 			{
 				Console.WriteLine(@"Lost buffers:");

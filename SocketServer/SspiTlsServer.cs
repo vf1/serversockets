@@ -211,7 +211,7 @@ namespace SocketServers
 
 								// create eventarg and call onreceived event
 								//
-								var e2 = buffersPool.Get();
+								var e2 = EventArgsManager.Get();
 
 								base.PrepareEventArgs(connection, e2);
 
@@ -221,7 +221,7 @@ namespace SocketServers
 								bool continue1 = OnReceived(connection, ref e2);
 
 								if (e2 != null)
-									buffersPool.Put(e2);
+									EventArgsManager.Put(e2);
 
 								if (continue1 == false)
 									return false;
@@ -292,7 +292,7 @@ namespace SocketServers
 					// prepare output buffer
 					//
 					if (oe == null)
-						oe = buffersPool.Get();
+						oe = EventArgsManager.Get();
 					oe.SetBufferMax();
 
 					output.Buffers[0].BufferType = BufferType.SECBUFFER_TOKEN;
@@ -424,7 +424,7 @@ namespace SocketServers
 			finally
 			{
 				if (oe != null)
-					buffersPool.Put(ref oe);
+					EventArgsManager.Put(ref oe);
 			}
 		}
 

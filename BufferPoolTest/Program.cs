@@ -6,7 +6,7 @@ namespace BufferPoolTest
 {
 	class Program
 	{
-		static BuffersPool<Item> pool;
+		static LockFreePool<Item> pool;
 		static bool[] items;
 		static bool run;
 		static int count;
@@ -45,7 +45,7 @@ namespace BufferPoolTest
 
 			Console.WriteLine();
 
-			pool = new BuffersPool<Item>(poolSize);
+			pool = new LockFreePool<Item>(poolSize);
 			items = new bool[65536];
 
 			run = true;
@@ -101,7 +101,7 @@ namespace BufferPoolTest
 		}
 	}
 
-	class Item : IBuffersPoolItem, IDisposable
+	class Item : ILockFreePoolItem, IDisposable
 	{
 		public static int count = -1;
 		public int Index;
@@ -112,8 +112,18 @@ namespace BufferPoolTest
 			Console.WriteLine(@"Buffer created: #{0}", Index + 1);
 		}
 
-		void IBuffersPoolItem.SetDefaultValues()
+		void ILockFreePoolItem.SetDefaultValue()
 		{
+		}
+
+		//void ILockFreePoolItem.TrueDispose()
+		//{
+		//}
+
+		bool ILockFreePoolItem.IsPooled
+		{
+			//get;
+			set { }
 		}
 
 		void IDisposable.Dispose()

@@ -26,14 +26,10 @@ namespace SocketServers
 				ReceiveSpinLock = new SpinLock();
 			}
 
-			public void Dispose(BuffersPool<ServerAsyncEventArgs> bufferPool)
-			{
-				ReceiveQueue.Dispose(bufferPool);
-				Dispose();
-			}
-
 			public void Dispose()
 			{
+				ReceiveQueue.Dispose();
+
 				if (sspiContext != null)
 					sspiContext.Dispose();
 
@@ -79,6 +75,7 @@ namespace SocketServers
 			#region class CyclicBuffer {...}
 
 			internal class CyclicBuffer
+				: IDisposable
 			{
 				private int size;
 				private volatile int dequeueIndex;
@@ -93,11 +90,11 @@ namespace SocketServers
 					queue = new ServerAsyncEventArgs[size];
 				}
 
-				public void Dispose(BuffersPool<ServerAsyncEventArgs> bufferPool)
+				public void Dispose()
 				{
 					for (int i = 0; i < queue.Length; i++)
 						if (queue[i] != null)
-							bufferPool.Put(queue[i]);
+							EventArgsManager.Put(ref queue[i]);
 				}
 
 				public int GetNextSequenceNumber()

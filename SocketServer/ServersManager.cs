@@ -21,18 +21,18 @@ namespace SocketServers
 		private SafeDictionary<ServerEndPoint, Server<C>> servers;
 		private SafeDictionary<ServerEndPoint, Server<C>> fakeServers;
 		private List<ProtocolPort> protocolPorts;
-		private BuffersPool<ServerAsyncEventArgs> buffersPool;
 		private List<UnicastIPAddressInformation> networkAddressInfos;
 		private ServersManagerConfig config;
 		private int nextPort;
 
-		public ServersManager(int buffersPoolSize, ServersManagerConfig config)
-			: this(new BuffersPool<ServerAsyncEventArgs>(buffersPoolSize), config)
+		public ServersManager(ServersManagerConfig config)
 		{
-		}
+			if (BufferManager.IsInitialized() == false)
+				BufferManager.Initialize(2048); // Mb
 
-		public ServersManager(BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
-		{
+			if (EventArgsManager.IsInitialized() == false)
+				EventArgsManager.Initialize();
+
 			this.running = false;
 
 			this.sync = new object();
@@ -43,7 +43,6 @@ namespace SocketServers
 			this.AddressPredicate = DefaultAddressPredicate;
 			this.FakeAddressAction = DefaultFakeAddressAction;
 
-			this.buffersPool = buffersPool;
 			this.config = config;
 
 			this.nextPort = config.MinPort;
@@ -102,9 +101,9 @@ namespace SocketServers
 			set;
 		}
 
-		public BuffersPool<ServerAsyncEventArgs> BuffersPool
+		public LockFreePool<ServerAsyncEventArgs> BuffersPool
 		{
-			get { return buffersPool; }
+			get { return EventArgsManager.Pool; }
 		}
 
 		public SocketError Bind(ProtocolPort pp)
@@ -272,7 +271,7 @@ namespace SocketServers
 							fakeEndpoint = FakeAddressAction(info.ServerEndPoint);
 					}
 
-					var server = Server<C>.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, buffersPool, config);
+					var server = Server<C>.Create(info.ServerEndPoint, fakeEndpoint, info.AddressInformation.IPv4Mask, config);
 					server.Received = Server_Received;
 					server.Sent = Server_Sent;
 					server.Failed = Server_Failed;
@@ -331,7 +330,7 @@ namespace SocketServers
 				Sent(this, ref e);
 
 			if (e != null)
-				buffersPool.Put(e);
+				EventArgsManager.Put(e);
 		}
 
 		private void Server_Failed(Server<C> server, ServerInfoEventArgs e)

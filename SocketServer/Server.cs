@@ -14,7 +14,6 @@ namespace SocketServers
 		where C : BaseConnection, new()
 	{
 		protected bool isRunning;
-		protected BuffersPool<ServerAsyncEventArgs> buffersPool;
 		protected ServerEndPoint realEndPoint;
 		private ServerEndPoint fakeEndPoint;
 		private long ip4Mask;
@@ -99,7 +98,7 @@ namespace SocketServers
 			}
 		}
 
-		public static Server<C> Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, BuffersPool<ServerAsyncEventArgs> buffersPool, ServersManagerConfig config)
+		public static Server<C> Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, ServersManagerConfig config)
 		{
 			Server<C> server = null;
 
@@ -113,7 +112,6 @@ namespace SocketServers
 				throw new InvalidOperationException(@"Protocol is not supported.");
 
 			server.realEndPoint = real.Clone();
-			server.buffersPool = buffersPool;
 
 			if (ip4fake != null)
 			{

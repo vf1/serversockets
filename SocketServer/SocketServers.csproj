@@ -43,12 +43,13 @@
     <Compile Include="BaseTcpServer.cs" />
     <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArraySegmentHelpers.cs" />
+    <Compile Include="EventArgsManager.cs" />
     <Compile Include="SmartBufferPool.cs" />
-    <Compile Include="BuffersPool.cs" />
+    <Compile Include="LockFreePool.cs" />
     <Compile Include="Global.cs" />
     <Compile Include="ProtocolPort.cs" />
     <Compile Include="SafeDictionary.cs" />
-    <Compile Include="SafeStack.cs" />
+    <Compile Include="LockFreeStack.cs" />
     <Compile Include="Secur32.cs" />
     <Compile Include="Server.Connection.cs" />
     <Compile Include="ServerAsyncEventArgs.cs" />

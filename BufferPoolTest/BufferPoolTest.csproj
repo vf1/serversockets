@@ -45,11 +45,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SocketServer\BuffersPool.cs">
-      <Link>BuffersPool.cs</Link>
+    <Compile Include="..\SocketServer\LockFreePool.cs">
+      <Link>LockFreePool.cs</Link>
     </Compile>
-    <Compile Include="..\SocketServer\SafeStack.cs">
-      <Link>SafeStack.cs</Link>
+    <Compile Include="..\SocketServer\LockFreeStack.cs">
+      <Link>LockFreeStack.cs</Link>
     </Compile>
     <Compile Include="BuffersPool2.cs" />
     <Compile Include="Program.cs" />

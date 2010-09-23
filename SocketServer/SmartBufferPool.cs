@@ -17,42 +17,42 @@ namespace SocketServers
 	/// </summary>
 	public class SmartBufferPool
 	{
-		public const int Kb = 1024;
-		public const int Mb = Kb * Kb;
-		public const int Gb = Mb * Kb;
+		public const long Kb = 1024;
+		public const long Mb = Kb * Kb;
+		public const long Gb = Mb * Kb;
 
-		public readonly int MaxMemoryUsage;
-		public readonly int InitialMemoryUsage;
-		public readonly int ExtraMemoryUsage;
-		public readonly int MaxBuffersCount;
+		public readonly long MaxMemoryUsage;
+		public readonly long InitialMemoryUsage;
+		public readonly long ExtraMemoryUsage;
+		public readonly long MaxBuffersCount;
 
-		public const int MinSize = 1 * Kb;
-		public const int MaxSize = 256 * Kb;
+		public const int MinSize = 1 * 1024;
+		public const int MaxSize = 256 * 1024;
 
 		private byte[][] buffers;
 		private long indexOffset;
-		private SafeStackItem<long>[] array;
-		private SafeStack<long> empty;
-		private SafeStack<long>[] ready;
+		private LockFreeStackItem<long>[] array;
+		private LockFreeStack<long> empty;
+		private LockFreeStack<long>[] ready;
 
 		public SmartBufferPool(int maxMemoryUsageMb, int initialSizeMb, int extraBufferSizeMb)
 		{
 			InitialMemoryUsage = initialSizeMb * Mb;
 			ExtraMemoryUsage = extraBufferSizeMb * Mb;
 			MaxBuffersCount = (maxMemoryUsageMb * Mb - InitialMemoryUsage) / ExtraMemoryUsage;
-			MaxMemoryUsage = InitialMemoryUsage + ExtraMemoryUsage * (MaxMemoryUsage - 1);
+			MaxMemoryUsage = InitialMemoryUsage + ExtraMemoryUsage * MaxBuffersCount;
 
-			array = new SafeStackItem<long>[MaxMemoryUsage / MinSize];
+			array = new LockFreeStackItem<long>[MaxMemoryUsage / MinSize];
 
-			empty = new SafeStack<long>(array, 0, array.Length);
+			empty = new LockFreeStack<long>(array, 0, array.Length);
 
 			int count = 0;
 			while (MaxSize >> count >= MinSize)
 				count++;
 
-			ready = new SafeStack<long>[count];
+			ready = new LockFreeStack<long>[count];
 			for (int i = 0; i < ready.Length; i++)
-				ready[i] = new SafeStack<long>(array, -1, -1);
+				ready[i] = new LockFreeStack<long>(array, -1, -1);
 
 			buffers = new byte[MaxBuffersCount][];
 			buffers[0] = NewBuffer(InitialMemoryUsage);
@@ -141,11 +141,11 @@ namespace SocketServers
 			return count;
 		}
 
-		private static byte[] NewBuffer(int size)
+		private static byte[] NewBuffer(long size)
 		{
 			var buffer = new byte[size];
-			for (int i = 0; i < size; i += 1 * Kb)
-				buffer[i] = 0;
+		//	for (int i = 0; i < size; i += 1024)
+		//		buffer[i] = 0;
 
 			return buffer;
 		}

@@ -11,18 +11,19 @@ namespace SocketServers
 {
 	public class ServerAsyncEventArgs
 		: EventArgs
-		, IBuffersPoolItem
+		, ILockFreePoolItem
 		, IDisposable
 	{
 		public const int DefaultUserToken1 = -1;
 		public const object DefaultUserToken2 = null;
 		public const int AnyNewConnectionId = -1;
 		public const int AnyConnectionId = -2;
+		public const int DefaultSize = 4096;
 
+		private bool isPooled;
 		private SocketAsyncEventArgs socketArgs;
 		private ArraySegment<byte> segment;
 		private int emulatedBytesTransfred;
-		private const int defaultSize = 4096;
 
 		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
 
@@ -36,10 +37,44 @@ namespace SocketServers
 
 			socketArgs.Completed += SocketArgs_Completed;
 
-			SetDefaultValues();
+			SetDefaultValue();
 		}
 
-		public void SetDefaultValues()
+#if DISABLED_FOR_OPTIMIZATION
+		~ServerAsyncEventArgs()
+		{
+		    if (isPooled)
+		    {
+		        BufferManager.Free(ref segment);
+		    }
+		    else
+		    {
+		        GC.ReRegisterForFinalize(this);
+		        EventArgsManager.Put(this);
+		    }
+		}
+#endif
+
+		public void Dispose()
+		{
+			if (isPooled)
+			{
+				BufferManager.Free(ref segment);
+			}
+			else
+			{
+				EventArgsManager.Put(this);
+			}
+		}
+
+		#region ILockFreePoolItem
+
+		bool ILockFreePoolItem.IsPooled
+		{
+			set { isPooled = value; }
+		}
+
+		public void SetDefaultValue()
 		{
 			UserToken1 = DefaultUserToken1;
 			UserToken2 = DefaultUserToken2;
@@ -47,14 +82,11 @@ namespace SocketServers
 			Completed = null;
 			emulatedBytesTransfred = 0;
 
-			if (segment.Array != null && segment.Count != defaultSize)
+			if (segment.Array != null && segment.Count != DefaultSize)
 				BufferManager.Free(ref segment);
 		}
 
-		public void Dispose()
-		{
-			BufferManager.Free(ref segment);
-		}
+		#endregion
 
 		public ServerEndPoint LocalEndPoint
 		{
@@ -155,7 +187,7 @@ namespace SocketServers
 
 		public int BufferCapacity
 		{
-			get { return (segment.IsValid()) ? segment.Count : defaultSize; }
+			get { return (segment.IsValid()) ? segment.Count : DefaultSize; }
 		}
 
 		public int Count

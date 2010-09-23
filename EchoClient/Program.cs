@@ -17,12 +17,6 @@ namespace EchoClient
 	{
 		static void Main(string[] args)
 		{
-		//	System.Threading.Thread.Sleep(2000);
-		//	var sslClient = new SslClient();
-		//	sslClient.RunClient("localhost", "localhost");
-
-		//	return;
-
 			if (args.Length < 2)
 			{
 				Console.WriteLine("Specify at least port number and IPv4 address.");
@@ -273,6 +267,9 @@ namespace EchoClient
 			}
 
 			Thread.Sleep(2000);
+
+			socket.Shutdown(SocketShutdown.Both);
+			socket.Close();
 		}
 
 		static void ThreadProc(Object stateInfo)

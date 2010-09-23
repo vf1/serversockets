@@ -4,7 +4,7 @@ using System.Threading;
 namespace SocketServers
 {
 	class BuffersPool2<T>
-		where T : class, IBuffersPoolItem, new()
+		where T : class, ILockFreePoolItem, new()
 	{
 		private readonly int maxThread;
 		private readonly Int32 maxRowLength;
@@ -53,7 +53,7 @@ namespace SocketServers
 
 		public void Put(T item)
 		{
-			item.SetDefaultValues();
+			item.SetDefaultValue();
 
 			for (int i = count % maxThread; count < items.Length; i = (i + 1) % maxThread)
 			{

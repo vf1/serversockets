@@ -70,7 +70,7 @@ namespace SocketServers
 			{
 				if (listener != null)
 				{
-					connections.ForEach((c) => { c.Dispose(buffersPool); });
+					connections.ForEach((c) => { c.Dispose(); });
 					connections.Clear();
 
 					listener.Close();
@@ -89,7 +89,7 @@ namespace SocketServers
 				{
 					connections.Remove(remote);
 
-					connection.Dispose(buffersPool);
+					connection.Dispose();
 
 					OnEndTcpConnection(connection);
 					connection = null;
@@ -220,7 +220,7 @@ namespace SocketServers
 			ServerAsyncEventArgs first = null;
 			for (int i = 0; i < receiveQueueSize; i++)
 			{
-				var e = buffersPool.Get();
+				var e = EventArgsManager.Get();
 
 				if (SyncReceiveAsync(connection, e) == false)
 				{
@@ -262,10 +262,10 @@ namespace SocketServers
 						if (close)
 						{
 							if (e != null)
-								buffersPool.Put(ref e);
+								EventArgsManager.Put(ref e);
 
 							connections.Remove(socket.RemoteEndPoint);
-							connection.Dispose(buffersPool);
+							connection.Dispose();
 							OnEndTcpConnection(connection);
 
 							break;
@@ -276,7 +276,7 @@ namespace SocketServers
 						}
 
 						if (e == null)
-							e = buffersPool.Get();
+							e = EventArgsManager.Get();
 
 						if (SyncReceiveAsync(connection, e))
 							e = null;
@@ -285,7 +285,7 @@ namespace SocketServers
 				else
 				{
 					if (e != null)
-						buffersPool.Put(ref e);
+						EventArgsManager.Put(ref e);
 				}
 			}
 			catch
@@ -294,7 +294,7 @@ namespace SocketServers
 					throw;
 
 				if (e != null)
-					buffersPool.Put(ref e);
+					EventArgsManager.Put(ref e);
 			}
 		}
 

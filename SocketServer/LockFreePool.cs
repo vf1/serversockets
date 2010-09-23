@@ -10,20 +10,26 @@ using System.Threading;
 
 namespace SocketServers
 {
-	public class BuffersPool<T>
-		where T : class, IBuffersPoolItem, IDisposable, new()
+	public interface ILockFreePoolItem
 	{
-		private SafeStackItem<T>[] array;
-		private SafeStack<T> empty;
-		private SafeStack<T> full;
+		bool IsPooled { set; }
+		void SetDefaultValue();
+	}
+
+	public class LockFreePool<T>
+		where T : class, ILockFreePoolItem, IDisposable, new()
+	{
+		private LockFreeStackItem<T>[] array;
+		private LockFreeStack<T> empty;
+		private LockFreeStack<T> full;
 		private Int32 created;
 
-		internal BuffersPool(int size)
+		internal LockFreePool(int size)
 		{
-			array = new SafeStackItem<T>[size];
+			array = new LockFreeStackItem<T>[size];
 
-			full = new SafeStack<T>(array, -1, -1);
-			empty = new SafeStack<T>(array, 0, array.Length);
+			full = new LockFreeStack<T>(array, -1, -1);
+			empty = new LockFreeStack<T>(array, 0, array.Length);
 		}
 
 		public T Get()
@@ -41,11 +47,12 @@ namespace SocketServers
 			else
 			{
 				result = new T();
-				result.SetDefaultValues();
+				result.SetDefaultValue();
 
 				Interlocked.Increment(ref created);
 			}
 
+			result.IsPooled = false;
 			return result;
 		}
 
@@ -57,21 +64,22 @@ namespace SocketServers
 
 		public void Put(T value)
 		{
-			value.SetDefaultValues();
+			value.IsPooled = true;
 
 			int index = empty.Pop();
 			if (index >= 0)
 			{
+				value.SetDefaultValue();
+
 				array[index].Value = value;
 
 				full.Push(index);
 			}
 			else
 			{
+				value.Dispose();
 #if DEBUG
 				throw new Exception(@"BufferPool too small");
-#else
-				value.Dispose();
 #endif
 			}
 		}
@@ -85,10 +93,5 @@ namespace SocketServers
 		{
 			get { return created; }
 		}
-	}
-
-	public interface IBuffersPoolItem
-	{
-		void SetDefaultValues();
 	}
 }

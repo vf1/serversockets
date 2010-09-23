@@ -70,7 +70,7 @@ namespace SocketServers
 
 			for (int i = 0; i < count; i++)
 			{
-				var e = buffersPool.Get();
+				var e = EventArgsManager.Get();
 
 				PrepareBuffer(e);
 				if (socket.ReceiveFromAsync(e) == false)
@@ -94,7 +94,7 @@ namespace SocketServers
 				}
 
 				if (e == null)
-					e = buffersPool.Get();
+					e = EventArgsManager.Get();
 
 				PrepareBuffer(e);
 				if (socket.ReceiveFromAsync(e))
@@ -102,7 +102,7 @@ namespace SocketServers
 			}
 
 			if (isRunning == false)
-				buffersPool.Put(e);
+				EventArgsManager.Put(e);
 		}
 
 		private void PrepareBuffer(ServerAsyncEventArgs e)
