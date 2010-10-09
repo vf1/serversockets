@@ -189,24 +189,27 @@ namespace SocketServers
 
 		private void Accept_Completed(object sender, SocketAsyncEventArgs acceptEventArgs)
 		{
-			if (isRunning == false)
+			Connection<C> connection = null;
+
+			if (isRunning == true && acceptEventArgs.SocketError == SocketError.Success)
 			{
-				acceptEventArgs.AcceptSocket.SafeShutdownClose();
+				connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
+				connections.Add(connection.Socket.RemoteEndPoint, connection);
 			}
 			else
 			{
-				var connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
+				acceptEventArgs.AcceptSocket.SafeShutdownClose();
+			}
 
-				if (acceptEventArgs.SocketError == SocketError.Success)
-					connections.Add(connection.Socket.RemoteEndPoint, connection);
-
+			if (isRunning == true)
+			{
 				acceptEventArgs.AcceptSocket = null;
 				if (listener.AcceptAsync(acceptEventArgs) == false)
 					Accept_Completed(listener, acceptEventArgs);
-
-				if (isRunning)
-					BeginReceive(connection);
 			}
+
+			if (connection != null)
+				BeginReceive(connection);
 		}
 
 		protected abstract void OnNewTcpConnection(Connection<C> connection);
