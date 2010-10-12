@@ -53,6 +53,8 @@ namespace EchoClient
 			Console.WriteLine(@"Sleep 5 seconds");
 			System.Threading.Thread.Sleep(5000);
 
+			MultiConnection(server1, 4096, 1);
+			MultiConnection(server1, 16, 512);
 			EchoTls(new IPEndPoint(server1.Address, server1.Port + 1), 64);
 			EchoTlsSpliter(new IPEndPoint(server1.Address, server1.Port + 1));
 			EchoTcp(server1);
@@ -65,6 +67,55 @@ namespace EchoClient
 			Console.WriteLine(@"Press any key to stop client...");
 			Console.ReadKey();
 			Console.WriteLine();
+		}
+
+		private static void MultiConnection(IPEndPoint server, int repeat, int count)
+		{
+			Console.WriteLine(@"Multi Connection {1} x {2} sockets: {0}", server.ToString(), repeat, count);
+
+			Socket[] sockets = new Socket[count];
+			IAsyncResult[] results = new IAsyncResult[count];
+			byte[] data1 = new byte[] { 1, 2, 3, 4 };
+			byte[] data2 = new byte[16];
+
+			int start = Environment.TickCount;
+
+			for (int j = 0; j < repeat; j++)
+			{
+				for (int i = 0; i < sockets.Length; i++)
+				{
+					sockets[i] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					sockets[i].Bind(new IPEndPoint((server.AddressFamily == AddressFamily.InterNetwork) ? IPAddress.Any : IPAddress.IPv6Any, 0));
+
+					results[i] = sockets[i].BeginConnect(server, null, null);
+
+				}
+
+				for (int i = 0; i < sockets.Length; i++)
+				{
+					sockets[i].EndConnect(results[i]);
+
+					sockets[i].Send(data1);
+					sockets[i].Send(data1);
+					sockets[i].Send(data1);
+					sockets[i].Send(data1);
+
+					TcpReceive(sockets[i], data2);
+
+					sockets[i].Shutdown(SocketShutdown.Both);
+					results[i] = sockets[i].BeginDisconnect(true, null, null);
+					sockets[i].Close();
+				}
+			}
+
+			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+		}
+
+		private static void WriteResult(int start, int transfered)
+		{
+			int period =Environment.TickCount - start;
+			double mbits = (double)transfered * 8 / ((double)period / 1000) / (1024 * 1024);
+			Console.WriteLine(@"Result: {0} ms; -> {1:F} Mbit/s; <-> {2:F} Mbit/s", period, mbits, mbits * 2);
 		}
 
 		private static void EchoUdp(IPEndPoint server)
@@ -105,7 +156,7 @@ namespace EchoClient
 
 			socket.Close();
 
-			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+			WriteResult(start, 1024 * 256 * data1.Length * 3);
 		}
 
 		private static void EchoTcp(IPEndPoint server)
@@ -160,7 +211,7 @@ namespace EchoClient
 				sockets[i].Close();
 			}
 
-			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+			WriteResult(start, 1024 * 256 * data1.Length * 3);
 		}
 
 		static int TcpReceive(Socket socket, byte[] buffer)
@@ -222,7 +273,7 @@ namespace EchoClient
 			for (int i = 0; i < streams.Length; i++)
 				streams[i].Close();
 
-			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+			WriteResult(start, 1024 * 256 * data1.Length * 3);
 		}
 
 		private static void EchoTlsSpliter(IPEndPoint server)

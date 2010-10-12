@@ -3,6 +3,7 @@
 // Please see Notice.txt for details.
 
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -15,15 +16,33 @@ namespace SocketServers
 			: IDisposable
 			where C2 : IDisposable
 		{
-			private static int connectionCount;
+			private static volatile int connectionCount;
 			private SspiContext sspiContext;
+			private volatile int closeCount;
 
 			public Connection(Socket socket, int receivedQueueSize)
 			{
 				Socket = socket;
+				RemoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
 				Id = NewConnectionId();
 				ReceiveQueue = new CyclicBuffer(receivedQueueSize);
 				ReceiveSpinLock = new SpinLock();
+			}
+
+#pragma warning disable 0420
+
+			internal bool Close()
+			{
+				Dispose();
+
+				return Interlocked.Increment(ref closeCount) == 1;
+			}
+
+#pragma warning restore 0420
+
+			internal bool IsClosed
+			{
+				get { return closeCount > 0; }
 			}
 
 			public void Dispose()
@@ -46,6 +65,7 @@ namespace SocketServers
 			public readonly Socket Socket;
 			public readonly SpinLock ReceiveSpinLock;
 			public readonly CyclicBuffer ReceiveQueue;
+			public readonly IPEndPoint RemoteEndPoint;
 			public C2 UserConnection;
 
 			public SspiContext SspiContext
@@ -57,6 +77,8 @@ namespace SocketServers
 					return sspiContext;
 				}
 			}
+
+#pragma warning disable 0420
 
 			private int NewConnectionId()
 			{
@@ -72,51 +94,65 @@ namespace SocketServers
 				return connectionId;
 			}
 
+#pragma warning restore 0420
+
 			#region class CyclicBuffer {...}
 
 			internal class CyclicBuffer
 				: IDisposable
 			{
+				private bool disposed;
 				private int size;
 				private volatile int dequeueIndex;
-				private int sequenceNumber;
 				private ServerAsyncEventArgs[] queue;
 
 				public CyclicBuffer(int size1)
 				{
+					disposed = false;
 					size = size1;
 					dequeueIndex = 0;
-					sequenceNumber = 0;
+					SequenceNumber = 0;
 					queue = new ServerAsyncEventArgs[size];
 				}
 
 				public void Dispose()
 				{
+					disposed = true;
+
+					var e = default(ServerAsyncEventArgs);
+
 					for (int i = 0; i < queue.Length; i++)
+					{
 						if (queue[i] != null)
-							EventArgsManager.Put(ref queue[i]);
+							e = Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[i], null);
+
+						if (e != null)
+							EventArgsManager.Put(ref e);
+					}
 				}
 
-				public int GetNextSequenceNumber()
-				{
-					return sequenceNumber++;
-				}
+				public volatile int SequenceNumber;
 
 				public void Put(ServerAsyncEventArgs e)
 				{
+					int index = e.SequenceNumber % size;
 #if DEBUG
-					if (queue[e.SequenceNumber % size] != null)
+					if (queue[index] != null)
 						throw new InvalidOperationException();
 #endif
-					Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[e.SequenceNumber % size], e);
+
+					Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[index], e);
+
+					if (disposed)
+					{
+						if (Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[index], null) != null)
+							EventArgsManager.Put(e);
+					}
 				}
 
 				public ServerAsyncEventArgs GetCurrent()
 				{
-					ServerAsyncEventArgs e =
-						Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[dequeueIndex], null);
-
-					return e;
+					return Interlocked.Exchange<ServerAsyncEventArgs>(ref queue[dequeueIndex], null);
 				}
 
 #pragma warning disable 0420

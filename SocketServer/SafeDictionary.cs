@@ -54,6 +54,26 @@ namespace SocketServers
 			}
 		}
 
+		public T Replace(K key, T value)
+		{
+			try
+			{
+				sync.EnterWriteLock();
+
+				T oldValue;
+				if (dictionary.TryGetValue(key, out oldValue))
+					dictionary.Remove(key);
+
+				dictionary.Add(key, value);
+
+				return oldValue;
+			}
+			finally
+			{
+				sync.ExitWriteLock();
+			}
+		}
+
 		public bool Remove(K key)
 		{
 			bool result;

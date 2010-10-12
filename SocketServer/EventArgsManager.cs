@@ -33,11 +33,15 @@ namespace SocketServers
 
 		public static void Put(ref ServerAsyncEventArgs value)
 		{
+			value.ResetTracing();
+
 			pool.Put(ref value);
 		}
 
 		public static void Put(ServerAsyncEventArgs value)
 		{
+			value.ResetTracing();
+
 			pool.Put(value);
 		}
 

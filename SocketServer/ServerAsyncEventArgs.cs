@@ -6,6 +6,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace SocketServers
 {
@@ -25,6 +26,10 @@ namespace SocketServers
 		private ArraySegment<byte> segment;
 		private int emulatedBytesTransfred;
 
+#if DEBUG
+		private List<string> tracing;
+#endif
+
 		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
 
 		public ServerAsyncEventArgs()
@@ -38,6 +43,10 @@ namespace SocketServers
 			socketArgs.Completed += SocketArgs_Completed;
 
 			SetDefaultValue();
+
+#if DEBUG
+			tracing = new List<string>();
+#endif
 		}
 
 #if DISABLED_FOR_OPTIMIZATION
@@ -84,6 +93,61 @@ namespace SocketServers
 
 			if (segment.Array != null && segment.Count != DefaultSize)
 				BufferManager.Free(ref segment);
+		}
+
+		#endregion
+
+		#region Tracing
+
+//#if DEBUG
+//        ~ServerAsyncEventArgs()
+//        {
+//            if (isPooled == false)
+//            {
+//                Console.WriteLine("Lost ServerAsyncEventArgs: {0}", GetTracingPath());
+//            }
+//        }
+//#endif
+
+		[Conditional("DEBUG")]
+		public void Trace(string place)
+		{
+#if DEBUG
+			tracing.Add(place);
+#endif
+		}
+
+		[Conditional("DEBUG")]
+		public void Trace()
+		{
+#if DEBUG
+			var stackTrace = new StackTrace();
+
+			//stackTrace.GetFrame(1).GetMethod().DeclaringType.Name + @":" 
+			tracing.Add(stackTrace.GetFrame(1).GetMethod().Name);
+#endif
+		}
+
+		[Conditional("DEBUG")]
+		public void ResetTracing()
+		{
+#if DEBUG
+			tracing.Clear();
+#endif
+		}
+
+		public string GetTracingPath()
+		{
+#if DEBUG
+			string path = "";
+
+			foreach (var item in tracing)
+				path += "[" + item + "]->";
+
+			return path;
+#else
+			return @"NO TRACING";
+#endif
 		}
 
 		#endregion

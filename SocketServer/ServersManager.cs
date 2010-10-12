@@ -319,18 +319,32 @@ namespace SocketServers
 
 		private bool Server_Received(Server<C> server, C c, ref ServerAsyncEventArgs e)
 		{
-			if (Received != null)
-				return Received(this, c, ref e);
-			return false;
+			try
+			{
+				if (Received != null)
+					return Received(this, c, ref e);
+				return false;
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in Received event handler", ex);
+			}
 		}
 
 		private void Server_Sent(Server<C> server, ServerAsyncEventArgs e)
 		{
-			if (Sent != null)
-				Sent(this, ref e);
+			try
+			{
+				if (Sent != null)
+					Sent(this, ref e);
 
-			if (e != null)
-				EventArgsManager.Put(e);
+				if (e != null)
+					EventArgsManager.Put(e);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in Sent event handler", ex);
+			}
 		}
 
 		private void Server_Failed(Server<C> server, ServerInfoEventArgs e)
@@ -342,48 +356,83 @@ namespace SocketServers
 
 		private void Server_NewConnection(Server<C> server, BaseConnection e)
 		{
-			if (NewConnection != null)
-				NewConnection(this, e);
+			try
+			{
+				if (NewConnection != null)
+					NewConnection(this, e);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in NewConnection event handler", ex);
+			}
 		}
 
 		private void Server_EndConnection(Server<C> server, BaseConnection e)
 		{
-			if (EndConnection != null)
-				EndConnection(this, e);
+			try
+			{
+				if (EndConnection != null)
+					EndConnection(this, e);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in EndConnection event handler", ex);
+			}
 		}
 
 		private void OnServerAdded(Server<C> server)
 		{
-			if (server.FakeEndPoint != null)
+			try
 			{
-				fakeServers.Add(server.FakeEndPoint, server);
-				if (ServerAdded != null)
-					ServerAdded(this, new ServerChangeEventArgs(server.FakeEndPoint));
-			}
+				if (server.FakeEndPoint != null)
+				{
+					fakeServers.Add(server.FakeEndPoint, server);
+					if (ServerAdded != null)
+						ServerAdded(this, new ServerChangeEventArgs(server.FakeEndPoint));
+				}
 
-			if (ServerAdded != null)
-				ServerAdded(this, new ServerChangeEventArgs(server.LocalEndPoint));
+				if (ServerAdded != null)
+					ServerAdded(this, new ServerChangeEventArgs(server.LocalEndPoint));
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in ServerAdded event handler", ex);
+			}
 		}
 
 		private void OnServerRemoved(Server<C> server)
 		{
 			server.Dispose();
 
-			if (server.FakeEndPoint != null)
+			try
 			{
-				fakeServers.Remove(server.FakeEndPoint);
-				if (ServerRemoved != null)
-					ServerRemoved(this, new ServerChangeEventArgs(server.FakeEndPoint));
-			}
+				if (server.FakeEndPoint != null)
+				{
+					fakeServers.Remove(server.FakeEndPoint);
+					if (ServerRemoved != null)
+						ServerRemoved(this, new ServerChangeEventArgs(server.FakeEndPoint));
+				}
 
-			if (ServerRemoved != null)
-				ServerRemoved(this, new ServerChangeEventArgs(server.LocalEndPoint));
+				if (ServerRemoved != null)
+					ServerRemoved(this, new ServerChangeEventArgs(server.LocalEndPoint));
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in ServerRemoved event handler", ex);
+			}
 		}
 
 		private void OnServerInfo(ServerInfoEventArgs e)
 		{
-			if (ServerInfo != null)
-				ServerInfo(this, e);
+			try
+			{
+				if (ServerInfo != null)
+					ServerInfo(this, e);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in ServerInfo event handler", ex);
+			}
 		}
 	}
 }

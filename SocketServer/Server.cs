@@ -70,23 +70,14 @@ namespace SocketServers
 		{
 			if (NewConnection != null)
 			{
-				try
+				connection.UserConnection = new C()
 				{
-					IPEndPoint remote = connection.Socket.RemoteEndPoint as IPEndPoint;
+					LocalEndPoint = GetLocalEndpoint(connection.RemoteEndPoint.Address),
+					RemoteEndPoint = connection.RemoteEndPoint,
+					Id = connection.Id,
+				};
 
-					connection.UserConnection = new C()
-					{
-						LocalEndPoint = GetLocalEndpoint((remote as IPEndPoint).Address),
-						RemoteEndPoint = remote as IPEndPoint,
-						Id = connection.Id,
-					};
-
-					NewConnection(this, connection.UserConnection);
-				}
-				catch (ObjectDisposedException)
-				{
-					// Socket was disposed -- no event
-				}
+				NewConnection(this, connection.UserConnection);
 			}
 		}
 

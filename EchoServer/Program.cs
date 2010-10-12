@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using SocketServers;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 
 namespace EchoServer
 {
@@ -84,7 +85,14 @@ namespace EchoServer
 			/////////////////////////////////////////////////////////////////////////
 
 			Console.WriteLine(@"Press any key to stop server...");
-			Console.ReadKey();
+
+			while (Console.KeyAvailable == false)
+			{
+				Console.Write("Connections: {0} - {1} = {2}\t\r", openedConnections, closedConnections, openedConnections - closedConnections);
+				Thread.Sleep(500);
+			}
+			Console.ReadKey(true);
+
 			Console.WriteLine();
 
 			/////////////////////////////////////////////////////////////////////////
@@ -159,14 +167,17 @@ namespace EchoServer
 			Console.WriteLine(@"  -    Info: [ {0} ] {1}", e.ServerEndPoint.ToString(), e.ToString());
 		}
 
+		private static int openedConnections;
+		private static int closedConnections;
+
 		static void ServersManager_NewConnection(ServersManager<BaseConnection> s, BaseConnection e)
 		{
-			Console.WriteLine(@"  -    -    New Connection: [ {0} ] ID: {1}", e.LocalEndPoint.ToString(), e.Id);
+			Interlocked.Increment(ref openedConnections);
 		}
 
 		static void ServersManager_EndConnection(ServersManager<BaseConnection> s, BaseConnection e)
 		{
-			Console.WriteLine(@"  -    -    End Connection: ID: {0}", e.Id);
+			Interlocked.Increment(ref closedConnections);
 		}
 	}
 }

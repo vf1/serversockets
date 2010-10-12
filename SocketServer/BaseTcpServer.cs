@@ -27,7 +27,7 @@ namespace SocketServers
 		{
 			sync = new object();
 
-			acceptQueueSize = (config.TcpAcceptQueueSize > 0) ? config.TcpAcceptQueueSize : 16;
+			acceptQueueSize = (config.TcpAcceptQueueSize > 0) ? config.TcpAcceptQueueSize : 64;
 			receiveQueueSize = (config.TcpQueueSize > 0) ? config.TcpQueueSize : 8;
 			offsetOffset = config.TcpOffsetOffset;
 		}
@@ -194,11 +194,15 @@ namespace SocketServers
 			if (isRunning == true && acceptEventArgs.SocketError == SocketError.Success)
 			{
 				connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
-				connections.Add(connection.Socket.RemoteEndPoint, connection);
+				var oldConnection = connections.Replace(connection.RemoteEndPoint, connection);
+
+				if (oldConnection != null && oldConnection.Close())
+					OnEndTcpConnection(oldConnection);
 			}
 			else
 			{
-				acceptEventArgs.AcceptSocket.SafeShutdownClose();
+				if (acceptEventArgs.AcceptSocket != null)
+					acceptEventArgs.AcceptSocket.SafeShutdownClose();
 			}
 
 			if (isRunning == true)
@@ -220,31 +224,28 @@ namespace SocketServers
 		{
 			OnNewTcpConnection(connection);
 
-			ServerAsyncEventArgs first = null;
+			ServerAsyncEventArgs e;
 			for (int i = 0; i < receiveQueueSize; i++)
 			{
-				var e = EventArgsManager.Get();
+				e = EventArgsManager.Get();
 
-				if (SyncReceiveAsync(connection, e) == false)
-				{
-					if (i > 0)
-						connection.ReceiveQueue.Put(e);
-					else
-						first = e;
-				}
+				if (TcpReceiveAsync(connection, e) == false)
+					connection.ReceiveQueue.Put(e);
 			}
 
-			if (first != null)
-				first.OnCompleted(connection.Socket);
+			e = connection.ReceiveQueue.GetCurrent();
+			if (e != null)
+				Receive_Completed(connection.Socket, e);
 		}
 
 		private void Receive_Completed(Socket socket, ServerAsyncEventArgs e)
 		{
 			try
 			{
-				Connection<C> connection = null;
-				if (connections.TryGetValue(e.RemoteEndPoint, out connection)
-					&& connection.Socket == socket)
+				Connection<C> connection;
+				connections.TryGetValue(e.RemoteEndPoint, out connection);
+
+				if (connection != null && connection.Socket == socket)
 				{
 					for (; ; )
 					{
@@ -264,12 +265,10 @@ namespace SocketServers
 
 						if (close)
 						{
-							if (e != null)
-								EventArgsManager.Put(ref e);
+							connections.Remove(connection.RemoteEndPoint);
 
-							connections.Remove(socket.RemoteEndPoint);
-							connection.Dispose();
-							OnEndTcpConnection(connection);
+							if (connection.Close())
+								OnEndTcpConnection(connection);
 
 							break;
 						}
@@ -281,47 +280,54 @@ namespace SocketServers
 						if (e == null)
 							e = EventArgsManager.Get();
 
-						if (SyncReceiveAsync(connection, e))
+						if (TcpReceiveAsync(connection, e))
 							e = null;
 					}
 				}
-				else
-				{
-					if (e != null)
-						EventArgsManager.Put(ref e);
-				}
 			}
-			catch
+			finally
 			{
-				if (isRunning)
-					throw;
-
 				if (e != null)
 					EventArgsManager.Put(ref e);
 			}
 		}
 
-		private bool SyncReceiveAsync(Connection<C> connection, ServerAsyncEventArgs e)
+		private bool TcpReceiveAsync(Connection<C> connection, ServerAsyncEventArgs e)
 		{
 			PrepareEventArgs(connection, e);
 
-			connection.ReceiveSpinLock.Enter();
-
 			try
 			{
-				e.SequenceNumber = connection.ReceiveQueue.GetNextSequenceNumber();
-				return connection.Socket.ReceiveAsync(e);
+				connection.ReceiveSpinLock.Enter();
+
+				e.SequenceNumber = connection.ReceiveQueue.SequenceNumber;
+
+				try
+				{
+					if (connection.IsClosed == false)
+					{
+						bool result = connection.Socket.ReceiveAsync(e);
+						connection.ReceiveQueue.SequenceNumber++;
+						return result;
+					}
+				}
+				finally
+				{
+					connection.ReceiveSpinLock.Exit();
+				}
 			}
-			finally
+			catch (ObjectDisposedException)
 			{
-				connection.ReceiveSpinLock.Exit();
 			}
+
+			EventArgsManager.Put(ref e);
+			return true;
 		}
 
 		protected void PrepareEventArgs(Connection<C> connection, ServerAsyncEventArgs e)
 		{
 			e.ConnectionId = connection.Id;
-			e.RemoteEndPoint = connection.Socket.RemoteEndPoint as IPEndPoint;
+			e.RemoteEndPoint = connection.RemoteEndPoint;
 			e.Completed = Receive_Completed;
 			e.SetBufferMax(offsetOffset);
 		}
