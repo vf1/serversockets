@@ -8,6 +8,17 @@ using System.Runtime.InteropServices;
 
 namespace SocketServers
 {
+	[StructLayout(LayoutKind.Explicit)]
+	struct LockFreeQueueVars
+	{
+		[FieldOffset(0)]
+		public Int64 Head;
+		[FieldOffset(64)]
+		public Int64 Tail;
+		[FieldOffset(128)]
+		public Int32 padding;
+	}
+
 	/// <summary>
 	/// Non-blocking queue implementation from:
 	///		Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms
@@ -16,28 +27,21 @@ namespace SocketServers
 	/// </summary>
 	class LockFreeQueue<T>
 	{
-		[StructLayout(LayoutKind.Sequential, Pack = 128)]
-		struct PaddedVars
-		{
-			public Int64 head;
-			public Int64 tail;
-			public LockFreeItem<T>[] array;
-		}
+		private LockFreeQueueVars q;
+		private LockFreeItem<T>[] array;
 
-		private PaddedVars q;
-
-		public LockFreeQueue(LockFreeItem<T>[] array, Int32 enqueueFromDummy, Int32 enqueueCount)
+		public LockFreeQueue(LockFreeItem<T>[] array1, Int32 enqueueFromDummy, Int32 enqueueCount)
 		{
 			if (enqueueCount <= 0)
 				throw new ArgumentOutOfRangeException(@"enqueueCount", @"Queue must include at least one dummy element");
 
-			q.array = array;
-			q.head = enqueueFromDummy;
-			q.tail = enqueueFromDummy + enqueueCount - 1;
+			array = array1;
+			q.Head = enqueueFromDummy;
+			q.Tail = enqueueFromDummy + enqueueCount - 1;
 
 			for (Int32 i = 0; i < enqueueCount - 1; i++)
-				q.array[i + enqueueFromDummy].Next = enqueueFromDummy + i + 1;
-			q.array[q.tail].Next = 0xFFFFFFFFL;
+				array[i + enqueueFromDummy].Next = enqueueFromDummy + i + 1;
+			array[q.Tail].Next = 0xFFFFFFFFL;
 		}
 
 		public void Enqueue(Int32 index)
@@ -46,32 +50,32 @@ namespace SocketServers
 
 			unchecked
 			{
-				q.array[index].Next |= 0xFFFFFFFFL;
+				array[index].Next |= 0xFFFFFFFFL;
 
 				for (; ; )
 				{
-					tail1 = (UInt64)Interlocked.Read(ref q.tail);
-					next1 = (UInt64)Interlocked.Read(ref q.array[tail1 & 0xFFFFFFFFUL].Next);
+					tail1 = (UInt64)Interlocked.Read(ref q.Tail);
+					next1 = (UInt64)Interlocked.Read(ref array[tail1 & 0xFFFFFFFFUL].Next);
 
-					if (tail1 == (UInt64)q.tail)
+					if (tail1 == (UInt64)q.Tail)
 					{
 						if ((next1 & 0xFFFFFFFFUL) == 0xFFFFFFFFUL)
 						{
 							xchg = ((next1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | ((UInt64)(UInt32)index);
-							next2 = (UInt64)Interlocked.CompareExchange(ref q.array[tail1 & 0xFFFFFFFFUL].Next, (Int64)xchg, (Int64)next1);
+							next2 = (UInt64)Interlocked.CompareExchange(ref array[tail1 & 0xFFFFFFFFUL].Next, (Int64)xchg, (Int64)next1);
 							if (next2 == next1)
 								break;
 						}
 						else
 						{
 							xchg = ((tail1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | (next1 & 0xFFFFFFFFUL);
-							Interlocked.CompareExchange(ref q.tail, (Int64)xchg, (Int64)tail1);
+							Interlocked.CompareExchange(ref q.Tail, (Int64)xchg, (Int64)tail1);
 						}
 					}
 				}
 
 				xchg = ((tail1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | ((UInt64)(UInt32)index);
-				Interlocked.CompareExchange(ref q.tail, (Int64)xchg, (Int64)tail1);
+				Interlocked.CompareExchange(ref q.Tail, (Int64)xchg, (Int64)tail1);
 			}
 		}
 
@@ -84,11 +88,11 @@ namespace SocketServers
 			{
 				for (; ; )
 				{
-					head1 = (UInt64)Interlocked.Read(ref q.head);
-					tail1 = (UInt64)Interlocked.Read(ref q.tail);
-					next1 = (UInt64)Interlocked.Read(ref q.array[head1 & 0xFFFFFFFFUL].Next);
+					head1 = (UInt64)Interlocked.Read(ref q.Head);
+					tail1 = (UInt64)Interlocked.Read(ref q.Tail);
+					next1 = (UInt64)Interlocked.Read(ref array[head1 & 0xFFFFFFFFUL].Next);
 
-					if (head1 == (UInt64)q.head)
+					if (head1 == (UInt64)q.Head)
 					{
 						if ((head1 & 0xFFFFFFFFUL) == (tail1 & 0xFFFFFFFFUL))
 						{
@@ -96,18 +100,18 @@ namespace SocketServers
 								return -1;
 
 							xchg = ((tail1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | (next1 & 0xFFFFFFFFUL);
-							Interlocked.CompareExchange(ref q.tail, (Int64)xchg, (Int64)tail1);
+							Interlocked.CompareExchange(ref q.Tail, (Int64)xchg, (Int64)tail1);
 						}
 						else
 						{
-							T value = q.array[next1 & 0xFFFFFFFFUL].Value;
+							T value = array[next1 & 0xFFFFFFFFUL].Value;
 
 							xchg = ((head1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | (next1 & 0xFFFFFFFFUL);
-							head2 = (UInt64)Interlocked.CompareExchange(ref q.head, (Int64)xchg, (Int64)head1);
+							head2 = (UInt64)Interlocked.CompareExchange(ref q.Head, (Int64)xchg, (Int64)head1);
 							if (head2 == head1)
 							{
 								index = (Int32)(head1 & 0xFFFFFFFFUL);
-								q.array[index].Value = value;
+								array[index].Value = value;
 								return index;
 							}
 						}
