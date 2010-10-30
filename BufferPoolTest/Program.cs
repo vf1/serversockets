@@ -6,6 +6,10 @@ namespace BufferPoolTest
 {
 	class Program
 	{
+		static bool testPool = false;
+		static LockFreeItem<Item>[] array;
+		static LockFreeQueue<Item> queue;
+		static LockFreeStack<Item> stack;
 		static LockFreePool<Item> pool;
 		static bool[] items;
 		static bool run;
@@ -15,28 +19,8 @@ namespace BufferPoolTest
 		const int actions = 4;
 		const int poolSize = 16;
 
-		//static void Test(ref int value)
-		//{
-		//    value = -value;
-		//}
-
 		static void Main(string[] args)
 		{
-			//int[] arr = new int[] { 1, 2, 3, 4, 5, };
-
-			//Console.WriteLine("{0}, {1}, {2}, {3}, {4}", arr[0], arr[1], arr[2], arr[3], arr[4]);
-			//Test(ref arr[0]);
-			//Test(ref arr[4]);
-			//Console.WriteLine("{0}, {1}, {2}, {3}, {4}", arr[0], arr[1], arr[2], arr[3], arr[4]);
-
-			//return;
-
-			int worker, io;
-			ThreadPool.GetMaxThreads(out worker, out io);
-			Console.WriteLine("ThreadPool.Max worker {0}, io {1}", worker, io);
-			ThreadPool.GetMinThreads(out worker, out io);
-			Console.WriteLine("ThreadPool.Min worker {0}, io {1}", worker, io);
-
 			Console.WriteLine(@"ThreadPool Test Starting...");
 
 			Console.WriteLine(@"  All threads: {0}", threads);
@@ -45,7 +29,20 @@ namespace BufferPoolTest
 
 			Console.WriteLine();
 
-			pool = new LockFreePool<Item>(poolSize);
+			if (testPool)
+			{
+				pool = new LockFreePool<Item>(poolSize);
+			}
+			else
+			{
+				array = new LockFreeItem<Item>[poolSize + 1];
+				for (int i = 1; i < array.Length; i++)
+					array[i].Value = new Item();
+
+				queue = new LockFreeQueue<Item>(array, 0, poolSize + 1);
+				stack = new LockFreeStack<Item>(array, -1, -1);
+			}
+
 			items = new bool[65536];
 
 			run = true;
@@ -56,7 +53,7 @@ namespace BufferPoolTest
 			}
 
 			Console.WriteLine(@"Started. Press any key to stop...");
-			Console.ReadKey();
+			Console.ReadKey(true);
 
 			run = false;
 
@@ -64,17 +61,31 @@ namespace BufferPoolTest
 				Thread.Sleep(25);
 		}
 
+		static Int64 actionCount = 0;
+
 		static void TestBufferPool()
 		{
-			Interlocked.Increment(ref count);
+			bool console = Interlocked.Increment(ref count) == 1;
 			Thread.Sleep(100);
 
 			Item[] dequeued = new Item[actions];
 
+			int actionPower = 24;
+			Int64 actionPowered = 1 << actionPower;
 			while (run)
 			{
 				for (int i = 0; i < dequeued.Length; i++)
-					dequeued[i] = pool.Get();
+				{
+					if (testPool)
+						dequeued[i] = pool.Get();
+					else
+					{
+						int index = queue.Dequeue();
+						dequeued[i] = array[index].Value;
+						array[index].Value = null;
+						stack.Push(index);
+					}
+				}
 
 				for (int i = 0; i < dequeued.Length; i++)
 				{
@@ -88,7 +99,28 @@ namespace BufferPoolTest
 					items[dequeued[i].Index] = false;
 
 				for (int i = 0; i < dequeued.Length; i++)
-					pool.Put(dequeued[i]);
+				{
+					if (testPool)
+						pool.Put(dequeued[i]);
+					else
+					{
+						int index = stack.Pop();
+						array[index].Value = dequeued[i];
+						queue.Enqueue(index);
+					}
+
+					Interlocked.Increment(ref actionCount);
+				}
+
+				if (console)
+				{
+					if (actionPowered < actionCount)
+					{
+						Console.WriteLine("Reach 2 ^ {0}", actionPower);
+						actionPower++;
+						actionPowered <<= 1;
+					}
+				}
 			}
 
 			Interlocked.Decrement(ref count);
@@ -116,13 +148,8 @@ namespace BufferPoolTest
 		{
 		}
 
-		//void ILockFreePoolItem.TrueDispose()
-		//{
-		//}
-
 		bool ILockFreePoolItem.IsPooled
 		{
-			//get;
 			set { }
 		}
 

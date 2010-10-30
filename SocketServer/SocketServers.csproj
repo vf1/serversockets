@@ -44,6 +44,8 @@
     <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArraySegmentHelpers.cs" />
     <Compile Include="EventArgsManager.cs" />
+    <Compile Include="LockFreeItem.cs" />
+    <Compile Include="LockFreeQueue.cs" />
     <Compile Include="SmartBufferPool.cs" />
     <Compile Include="LockFreePool.cs" />
     <Compile Include="Global.cs" />

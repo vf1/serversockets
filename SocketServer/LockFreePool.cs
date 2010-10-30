@@ -19,14 +19,14 @@ namespace SocketServers
 	public class LockFreePool<T>
 		where T : class, ILockFreePoolItem, IDisposable, new()
 	{
-		private LockFreeStackItem<T>[] array;
+		private LockFreeItem<T>[] array;
 		private LockFreeStack<T> empty;
 		private LockFreeStack<T> full;
 		private Int32 created;
 
 		internal LockFreePool(int size)
 		{
-			array = new LockFreeStackItem<T>[size];
+			array = new LockFreeItem<T>[size];
 
 			full = new LockFreeStack<T>(array, -1, -1);
 			empty = new LockFreeStack<T>(array, 0, array.Length);

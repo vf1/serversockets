@@ -31,7 +31,7 @@ namespace SocketServers
 
 		private byte[][] buffers;
 		private long indexOffset;
-		private LockFreeStackItem<long>[] array;
+		private LockFreeItem<long>[] array;
 		private LockFreeStack<long> empty;
 		private LockFreeStack<long>[] ready;
 
@@ -42,7 +42,7 @@ namespace SocketServers
 			MaxBuffersCount = (maxMemoryUsageMb * Mb - InitialMemoryUsage) / ExtraMemoryUsage;
 			MaxMemoryUsage = InitialMemoryUsage + ExtraMemoryUsage * MaxBuffersCount;
 
-			array = new LockFreeStackItem<long>[MaxMemoryUsage / MinSize];
+			array = new LockFreeItem<long>[MaxMemoryUsage / MinSize];
 
 			empty = new LockFreeStack<long>(array, 0, array.Length);
 

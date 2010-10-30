@@ -45,8 +45,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\SocketServer\LockFreeItem.cs">
+      <Link>LockFreeItem.cs</Link>
+    </Compile>
     <Compile Include="..\SocketServer\LockFreePool.cs">
       <Link>LockFreePool.cs</Link>
+    </Compile>
+    <Compile Include="..\SocketServer\LockFreeQueue.cs">
+      <Link>LockFreeQueue.cs</Link>
     </Compile>
     <Compile Include="..\SocketServer\LockFreeStack.cs">
       <Link>LockFreeStack.cs</Link>
