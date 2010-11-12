@@ -43,7 +43,7 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate });
+			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate, RequseSocketPoolSizePerServer = 1024 });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{

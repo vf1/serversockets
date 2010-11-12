@@ -26,7 +26,7 @@ namespace SocketServers
 		private ArraySegment<byte> segment;
 		private int emulatedBytesTransfred;
 
-#if DEBUG
+#if EVENTARGS_TRACING
 		private List<string> tracing;
 #endif
 
@@ -44,7 +44,7 @@ namespace SocketServers
 
 			SetDefaultValue();
 
-#if DEBUG
+#if EVENTARGS_TRACING
 			tracing = new List<string>();
 #endif
 		}
@@ -99,28 +99,28 @@ namespace SocketServers
 
 		#region Tracing
 
-//#if DEBUG
-//        ~ServerAsyncEventArgs()
-//        {
-//            if (isPooled == false)
-//            {
-//                Console.WriteLine("Lost ServerAsyncEventArgs: {0}", GetTracingPath());
-//            }
-//        }
-//#endif
+#if EVENTARGS_TRACING
+        ~ServerAsyncEventArgs()
+        {
+            if (isPooled == false)
+            {
+                Console.WriteLine("Lost ServerAsyncEventArgs: {0}", GetTracingPath());
+            }
+        }
+#endif
 
-		[Conditional("DEBUG")]
+		[Conditional("EVENTARGS_TRACING")]
 		public void Trace(string place)
 		{
-#if DEBUG
+#if EVENTARGS_TRACING
 			tracing.Add(place);
 #endif
 		}
 
-		[Conditional("DEBUG")]
+		[Conditional("EVENTARGS_TRACING")]
 		public void Trace()
 		{
-#if DEBUG
+#if EVENTARGS_TRACING
 			var stackTrace = new StackTrace();
 
 			//stackTrace.GetFrame(1).GetMethod().DeclaringType.Name + @":" 
@@ -128,17 +128,17 @@ namespace SocketServers
 #endif
 		}
 
-		[Conditional("DEBUG")]
+		[Conditional("EVENTARGS_TRACING")]
 		public void ResetTracing()
 		{
-#if DEBUG
+#if EVENTARGS_TRACING
 			tracing.Clear();
 #endif
 		}
 
 		public string GetTracingPath()
 		{
-#if DEBUG
+#if EVENTARGS_TRACING
 			string path = "";
 
 			foreach (var item in tracing)
@@ -228,6 +228,12 @@ namespace SocketServers
 				RemoteEndPoint.Address = IPAddress.IPv6Any;
 			
 			RemoteEndPoint.Port = 0;
+		}
+
+		public bool DisconnectReuseSocket
+		{
+			get { return socketArgs.DisconnectReuseSocket; }
+			set { socketArgs.DisconnectReuseSocket = value; }
 		}
 
 		#endregion
@@ -339,6 +345,11 @@ namespace SocketServers
 			socketArgs.SetBuffer(segment.Array, offset, segment.Count + offset - segment.Offset);
 
 			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
+		}
+
+		public void FreeBuffer()
+		{
+			BufferManager.Free(ref segment);
 		}
 
 		#endregion

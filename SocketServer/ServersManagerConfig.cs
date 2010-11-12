@@ -16,5 +16,7 @@ namespace SocketServers
 		public int TcpQueueSize;
 		public int TcpAcceptQueueSize;
 		public X509Certificate2 TlsCertificate;
+		public int RequseSocketPoolSizePerServer;
+		public bool ReuseSocketForConnect;
 	}
 }

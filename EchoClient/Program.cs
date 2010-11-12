@@ -59,61 +59,94 @@ namespace EchoClient
 			EchoTlsSpliter(new IPEndPoint(server1.Address, server1.Port + 1));
 			EchoTcp(server1);
 			if (server2 != null)
-			    EchoTcp(server2);
+				EchoTcp(server2);
 			EchoUdp(server1);
 			if (server2 != null)
-			    EchoUdp(server2);
+				EchoUdp(server2);
 
 			Console.WriteLine(@"Press any key to stop client...");
 			Console.ReadKey();
 			Console.WriteLine();
 		}
 
+		//Create -----> Disconnect            Create ---------> Close
+		//219 ms        749 ms                265 ms            405 ms
+		//266 ms        687 ms                218 ms            452 ms
+		//358 ms        889 ms                234 ms            328 ms
+		//453 ms        702 ms                234 ms            468 ms
+		private static void MeasureConnectDisconnect(int count, IPEndPoint server, bool disconnectOrClose)
+		{
+			Socket[] sockets = new Socket[count];
+
+			int start1 = Environment.TickCount;
+
+			for (int x = 0; x < sockets.Length; x++)
+				sockets[x] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+			Console.WriteLine(@"Create sockets: {0} ms", Environment.TickCount - start1);
+
+
+			for (int x = 0; x < sockets.Length; x++)
+				sockets[x].Connect(server);
+
+
+			int start2 = Environment.TickCount;
+
+			for (int x = 0; x < sockets.Length; x++)
+			{
+				sockets[x].Shutdown(SocketShutdown.Both);
+				if (disconnectOrClose)
+					sockets[x].Disconnect(true);
+				else
+					sockets[x].Close();
+			}
+
+			Console.WriteLine((disconnectOrClose ? "Disconnect(reuse)" : "Close") + @" sockets: {0} ms",
+				Environment.TickCount - start2);
+		}
+
 		private static void MultiConnection(IPEndPoint server, int repeat, int count)
 		{
 			Console.WriteLine(@"Multi Connection {1} x {2} sockets: {0}", server.ToString(), repeat, count);
 
-			Socket[] sockets = new Socket[count];
+			Socket[] sockets = new Socket[count * repeat];
 			IAsyncResult[] results = new IAsyncResult[count];
 			byte[] data1 = new byte[] { 1, 2, 3, 4 };
-			byte[] data2 = new byte[16];
+
+			for (int x = 0; x < sockets.Length; x++)
+				sockets[x] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
 			int start = Environment.TickCount;
 
 			for (int j = 0; j < repeat; j++)
 			{
-				for (int i = 0; i < sockets.Length; i++)
+				for (int i = 0; i < count; i++)
 				{
-					sockets[i] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-					sockets[i].Bind(new IPEndPoint((server.AddressFamily == AddressFamily.InterNetwork) ? IPAddress.Any : IPAddress.IPv6Any, 0));
-
-					results[i] = sockets[i].BeginConnect(server, null, null);
-
+					results[i] = sockets[j * count + i].BeginConnect(server, null, null);
 				}
 
-				for (int i = 0; i < sockets.Length; i++)
+				for (int i = 0; i < count; i++)
 				{
-					sockets[i].EndConnect(results[i]);
+					int n = j * count + i;
 
-					sockets[i].Send(data1);
-					sockets[i].Send(data1);
-					sockets[i].Send(data1);
-					sockets[i].Send(data1);
+					sockets[n].EndConnect(results[i]);
 
-					TcpReceive(sockets[i], data2);
+					sockets[n].Send(data1);
+					TcpReceive(sockets[n], data1);
 
-					sockets[i].Shutdown(SocketShutdown.Both);
-					results[i] = sockets[i].BeginDisconnect(true, null, null);
-					sockets[i].Close();
+					sockets[n].Close();
 				}
 			}
 
 			Console.WriteLine(@"Elapsed: {0} ms", Environment.TickCount - start);
+
+			for (int x = 0; x < sockets.Length; x++)
+				sockets[x].Close();
 		}
 
 		private static void WriteResult(int start, int transfered)
 		{
-			int period =Environment.TickCount - start;
+			int period = Environment.TickCount - start;
 			double mbits = (double)transfered * 8 / ((double)period / 1000) / (1024 * 1024);
 			Console.WriteLine(@"Result: {0} ms; -> {1:F} Mbit/s; <-> {2:F} Mbit/s", period, mbits, mbits * 2);
 		}
@@ -234,7 +267,7 @@ namespace EchoClient
 			{
 				var client = new TcpClient();
 				client.Connect(server);
-				streams[i] = new SslStream(client.GetStream(), false, 
+				streams[i] = new SslStream(client.GetStream(), false,
 					new RemoteCertificateValidationCallback(ValidateServerCertificate));
 				streams[i].AuthenticateAsClient("localhost");
 			}

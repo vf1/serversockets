@@ -63,6 +63,7 @@
     <Compile Include="ServersManager.EndpointInfo.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="SocketEx.cs" />
+    <Compile Include="SocketRecycling.cs" />
     <Compile Include="SpinLock.cs" />
     <Compile Include="SspiContext.cs" />
     <Compile Include="StreamBuffer.cs" />

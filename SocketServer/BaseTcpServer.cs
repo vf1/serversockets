@@ -21,6 +21,8 @@ namespace SocketServers
 		private int acceptQueueSize;
 		private int receiveQueueSize;
 		private int offsetOffset;
+		private SocketRecycling recycling;
+		private bool reuseForConnect;
 
 		public BaseTcpServer(ServersManagerConfig config)
 			: base()
@@ -30,6 +32,8 @@ namespace SocketServers
 			acceptQueueSize = (config.TcpAcceptQueueSize > 0) ? config.TcpAcceptQueueSize : 64;
 			receiveQueueSize = (config.TcpQueueSize > 0) ? config.TcpQueueSize : 8;
 			offsetOffset = config.TcpOffsetOffset;
+			recycling = new SocketRecycling(config.RequseSocketPoolSizePerServer);
+			reuseForConnect = config.ReuseSocketForConnect;
 		}
 
 		public override void Start()
@@ -51,14 +55,21 @@ namespace SocketServers
 
 		private void EnqueueAsyncAccepts(Object stateInfo)
 		{
-			acceptEventArgs = new SocketAsyncEventArgs[acceptQueueSize];
-			for (int i = 0; i < acceptEventArgs.Length; i++)
+			lock (sync)
 			{
-				acceptEventArgs[i] = new SocketAsyncEventArgs();
-				acceptEventArgs[i].Completed += Accept_Completed;
+				if (isRunning)
+				{
+					acceptEventArgs = new SocketAsyncEventArgs[acceptQueueSize];
+					for (int i = 0; i < acceptEventArgs.Length; i++)
+					{
+						acceptEventArgs[i] = new SocketAsyncEventArgs();
+						acceptEventArgs[i].AcceptSocket = recycling.Get(realEndPoint.AddressFamily);
+						acceptEventArgs[i].Completed += Accept_Completed;
 
-				if (listener.AcceptAsync(acceptEventArgs[i]) == false)
-					Accept_Completed(listener, acceptEventArgs[i]);
+						if (listener.AcceptAsync(acceptEventArgs[i]) == false)
+							Accept_Completed(listener, acceptEventArgs[i]);
+					}
+				}
 			}
 		}
 
@@ -70,34 +81,20 @@ namespace SocketServers
 			{
 				if (listener != null)
 				{
-					connections.ForEach((c) => { c.Dispose(); });
+					connections.ForEach(EndTcpConnection);
 					connections.Clear();
 
 					listener.Close();
 					listener = null;
 				}
 			}
+
+			recycling.Dispose();
 		}
 
-		protected Connection<C> GetTcpConnection(IPEndPoint remote)
-		{
-			Connection<C> connection = null;
-
-			if (connections.TryGetValue(remote, out connection))
-			{
-				if (connection.Socket.Connected == false)
-				{
-					connections.Remove(remote);
-
-					connection.Dispose();
-
-					OnEndTcpConnection(connection);
-					connection = null;
-				}
-			}
-
-			return connection;
-		}
+		protected abstract void OnNewTcpConnection(Connection<C> connection);
+		protected abstract void OnEndTcpConnection(Connection<C> connection);
+		protected abstract bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e);
 
 		public override void SendAsync(ServerAsyncEventArgs e)
 		{
@@ -107,7 +104,12 @@ namespace SocketServers
 			{
 				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId)
 				{
-					Socket socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					Socket socket = null;
+					if (reuseForConnect)
+						socket = recycling.Get(realEndPoint.AddressFamily);
+					if (socket == null)
+						socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
 					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
 					socket.Bind(realEndPoint);
 
@@ -139,14 +141,14 @@ namespace SocketServers
 
 		private void Connect_Completed(Socket socket1, ServerAsyncEventArgs e)
 		{
-			bool beginReceive = false;
+			bool newConnection = false;
 			Connection<C> connection = null;
 
 			if (e.SocketError == SocketError.Success)
 			{
 				connection = new Connection<C>(socket1, receiveQueueSize);
 				connections.Add(e.RemoteEndPoint, connection);
-				beginReceive = true;
+				newConnection = true;
 			}
 			else
 			{
@@ -165,7 +167,7 @@ namespace SocketServers
 						{
 							connection = new Connection<C>(socket1, receiveQueueSize);
 							connections.Add(e.RemoteEndPoint, connection);
-							beginReceive = true;
+							newConnection = true;
 						}
 					}
 				}
@@ -177,8 +179,8 @@ namespace SocketServers
 			{
 				connection.Socket.SendAsync(e, Send_Completed);
 
-				if (beginReceive)
-					BeginReceive(connection);
+				if (newConnection)
+					NewTcpConnection(connection);
 			}
 			else
 			{
@@ -196,8 +198,8 @@ namespace SocketServers
 				connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
 				var oldConnection = connections.Replace(connection.RemoteEndPoint, connection);
 
-				if (oldConnection != null && oldConnection.Close())
-					OnEndTcpConnection(oldConnection);
+				if (oldConnection != null)
+					EndTcpConnection(oldConnection);
 			}
 			else
 			{
@@ -207,20 +209,16 @@ namespace SocketServers
 
 			if (isRunning == true)
 			{
-				acceptEventArgs.AcceptSocket = null;
+				acceptEventArgs.AcceptSocket = recycling.Get(realEndPoint.AddressFamily);
 				if (listener.AcceptAsync(acceptEventArgs) == false)
 					Accept_Completed(listener, acceptEventArgs);
 			}
 
 			if (connection != null)
-				BeginReceive(connection);
+				NewTcpConnection(connection);
 		}
 
-		protected abstract void OnNewTcpConnection(Connection<C> connection);
-		protected abstract void OnEndTcpConnection(Connection<C> connection);
-		protected abstract bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e);
-
-		private void BeginReceive(Connection<C> connection)
+		private void NewTcpConnection(Connection<C> connection)
 		{
 			OnNewTcpConnection(connection);
 
@@ -236,6 +234,50 @@ namespace SocketServers
 			e = connection.ReceiveQueue.GetCurrent();
 			if (e != null)
 				Receive_Completed(connection.Socket, e);
+		}
+
+		private void EndTcpConnection(Connection<C> connection)
+		{
+			if (connection.Close())
+			{
+				OnEndTcpConnection(connection);
+
+				if (connection.Socket.Connected)
+					try { connection.Socket.Shutdown(SocketShutdown.Send); }
+					catch (SocketException) { }
+
+				if (recycling.IsEnabled)
+				{
+					try
+					{
+						try
+						{
+							var e = EventArgsManager.Get();
+
+							e.FreeBuffer();
+							e.DisconnectReuseSocket = true;
+							e.Completed = Disconnect_Completed;
+
+							if (connection.Socket.DisconnectAsync(e) == false)
+								e.OnCompleted(connection.Socket);
+						}
+						catch (SocketException) { }
+					}
+					catch (NotSupportedException)
+					{
+						recycling.Dispose();
+					}
+				}
+
+				if (recycling.IsEnabled == false)
+					connection.Socket.Close();
+			}
+		}
+
+		private void Disconnect_Completed(Socket socket, ServerAsyncEventArgs e)
+		{
+			EventArgsManager.Put(e);
+			recycling.Recycle(socket, realEndPoint.AddressFamily);
 		}
 
 		private void Receive_Completed(Socket socket, ServerAsyncEventArgs e)
@@ -266,9 +308,7 @@ namespace SocketServers
 						if (close)
 						{
 							connections.Remove(connection.RemoteEndPoint);
-
-							if (connection.Close())
-								OnEndTcpConnection(connection);
+							EndTcpConnection(connection);
 
 							break;
 						}
@@ -330,6 +370,24 @@ namespace SocketServers
 			e.RemoteEndPoint = connection.RemoteEndPoint;
 			e.Completed = Receive_Completed;
 			e.SetBufferMax(offsetOffset);
+		}
+
+		protected Connection<C> GetTcpConnection(IPEndPoint remote)
+		{
+			Connection<C> connection = null;
+
+			if (connections.TryGetValue(remote, out connection))
+			{
+				if (connection.Socket.Connected == false)
+				{
+					connections.Remove(remote);
+					EndTcpConnection(connection);
+
+					connection = null;
+				}
+			}
+
+			return connection;
 		}
 	}
 }

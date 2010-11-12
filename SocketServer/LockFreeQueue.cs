@@ -11,11 +11,13 @@ namespace SocketServers
 	[StructLayout(LayoutKind.Explicit)]
 	struct LockFreeQueueVars
 	{
-		[FieldOffset(0)]
-		public Int64 Head;
 		[FieldOffset(64)]
-		public Int64 Tail;
+		public Int64 Head;
 		[FieldOffset(128)]
+		public Int64 Tail;
+		[FieldOffset(192)]
+		public bool HasDequeuePredicate;
+		[FieldOffset(256)]
 		public Int32 padding;
 	}
 
@@ -27,8 +29,9 @@ namespace SocketServers
 	/// </summary>
 	class LockFreeQueue<T>
 	{
-		private LockFreeQueueVars q;
 		private LockFreeItem<T>[] array;
+		private LockFreeQueueVars q;
+		private Predicate<T> dequeuePredicate;
 
 		public LockFreeQueue(LockFreeItem<T>[] array1, Int32 enqueueFromDummy, Int32 enqueueCount)
 		{
@@ -42,6 +45,16 @@ namespace SocketServers
 			for (Int32 i = 0; i < enqueueCount - 1; i++)
 				array[i + enqueueFromDummy].Next = enqueueFromDummy + i + 1;
 			array[q.Tail].Next = 0xFFFFFFFFL;
+		}
+
+		public Predicate<T> DequeuePredicate
+		{
+			get { return dequeuePredicate; }
+			set
+			{
+				dequeuePredicate = value;
+				q.HasDequeuePredicate = dequeuePredicate == null;
+			}
 		}
 
 		public void Enqueue(Int32 index)
@@ -105,6 +118,9 @@ namespace SocketServers
 						else
 						{
 							T value = array[next1 & 0xFFFFFFFFUL].Value;
+
+							if (q.HasDequeuePredicate && DequeuePredicate(value) == false)
+								return -1;
 
 							xchg = ((head1 + 0x100000000UL) & 0xFFFFFFFF00000000UL) | (next1 & 0xFFFFFFFFUL);
 							head2 = (UInt64)Interlocked.CompareExchange(ref q.Head, (Int64)xchg, (Int64)head1);

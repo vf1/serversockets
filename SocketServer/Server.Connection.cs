@@ -33,9 +33,23 @@ namespace SocketServers
 
 			internal bool Close()
 			{
-				Dispose();
+				if (Interlocked.Increment(ref closeCount) == 1)
+				{
+					ReceiveQueue.Dispose();
 
-				return Interlocked.Increment(ref closeCount) == 1;
+					if (sspiContext != null)
+						sspiContext.Dispose();
+
+					if (UserConnection != null)
+						UserConnection.Dispose();
+
+					if (UserConnection != null)
+						UserConnection.Dispose();
+
+					return true;
+				}
+
+				return false;
 			}
 
 #pragma warning restore 0420
@@ -45,20 +59,10 @@ namespace SocketServers
 				get { return closeCount > 0; }
 			}
 
-			public void Dispose()
+			void IDisposable.Dispose()
 			{
-				ReceiveQueue.Dispose();
-
-				if (sspiContext != null)
-					sspiContext.Dispose();
-
-				if (UserConnection != null)
-					UserConnection.Dispose();
-
-				Socket.SafeShutdownClose();
-
-				if (UserConnection != null)
-					UserConnection.Dispose();
+				if (Close())
+					Socket.SafeShutdownClose();
 			}
 
 			public readonly int Id;
