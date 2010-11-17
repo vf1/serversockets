@@ -14,26 +14,27 @@ namespace SocketServers
 		: Server<C>
 		where C : BaseConnection, new()
 	{
-		private object sync;
+		private readonly object sync;
 		private Socket listener;
-		private SocketAsyncEventArgs[] acceptEventArgs;
 		private SafeDictionary<EndPoint, Connection<C>> connections;
-		private int acceptQueueSize;
-		private int receiveQueueSize;
-		private int offsetOffset;
-		private SocketRecycling recycling;
-		private bool reuseForConnect;
+		private readonly int receiveQueueSize;
+		private readonly int offsetOffset;
+		private bool socketReuseEnabled;
+		private readonly int maxAcceptBacklog;
+		private readonly int minAcceptBacklog;
+		private int acceptBacklog;
 
 		public BaseTcpServer(ServersManagerConfig config)
 			: base()
 		{
 			sync = new object();
 
-			acceptQueueSize = (config.TcpAcceptQueueSize > 0) ? config.TcpAcceptQueueSize : 64;
-			receiveQueueSize = (config.TcpQueueSize > 0) ? config.TcpQueueSize : 8;
+			receiveQueueSize = config.TcpQueueSize;
 			offsetOffset = config.TcpOffsetOffset;
-			recycling = new SocketRecycling(config.RequseSocketPoolSizePerServer);
-			reuseForConnect = config.ReuseSocketForConnect;
+
+			minAcceptBacklog = config.TcpMinAcceptBacklog;
+			maxAcceptBacklog = config.TcpMaxAcceptBacklog;
+			socketReuseEnabled = minAcceptBacklog < maxAcceptBacklog;
 		}
 
 		public override void Start()
@@ -47,7 +48,7 @@ namespace SocketServers
 				listener = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
 				listener.Bind(realEndPoint);
-				listener.Listen(128);
+				listener.Listen(0);
 
 				ThreadPool.QueueUserWorkItem(new WaitCallback(EnqueueAsyncAccepts), null);
 			}
@@ -57,17 +58,22 @@ namespace SocketServers
 		{
 			lock (sync)
 			{
-				if (isRunning)
+				for (; ; )
 				{
-					acceptEventArgs = new SocketAsyncEventArgs[acceptQueueSize];
-					for (int i = 0; i < acceptEventArgs.Length; i++)
+					int backlog = Thread.VolatileRead(ref acceptBacklog);
+					if (isRunning && backlog < minAcceptBacklog)
 					{
-						acceptEventArgs[i] = new SocketAsyncEventArgs();
-						acceptEventArgs[i].AcceptSocket = recycling.Get(realEndPoint.AddressFamily);
-						acceptEventArgs[i].Completed += Accept_Completed;
+						if (Interlocked.CompareExchange(ref acceptBacklog, backlog + 1, backlog) == backlog)
+						{
+							var e = EventArgsManager.Get();
+							e.FreeBuffer();
 
-						if (listener.AcceptAsync(acceptEventArgs[i]) == false)
-							Accept_Completed(listener, acceptEventArgs[i]);
+							listener.AcceptAsync(e, Accept_Completed);
+						}
+					}
+					else
+					{
+						break;
 					}
 				}
 			}
@@ -88,8 +94,6 @@ namespace SocketServers
 					listener = null;
 				}
 			}
-
-			recycling.Dispose();
 		}
 
 		protected abstract void OnNewTcpConnection(Connection<C> connection);
@@ -104,11 +108,7 @@ namespace SocketServers
 			{
 				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId)
 				{
-					Socket socket = null;
-					if (reuseForConnect)
-						socket = recycling.Get(realEndPoint.AddressFamily);
-					if (socket == null)
-						socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					Socket socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
 					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
 					socket.Bind(realEndPoint);
@@ -146,7 +146,7 @@ namespace SocketServers
 
 			if (e.SocketError == SocketError.Success)
 			{
-				connection = new Connection<C>(socket1, receiveQueueSize);
+				connection = new Connection<C>(socket1, false, receiveQueueSize);
 				connections.Add(e.RemoteEndPoint, connection);
 				newConnection = true;
 			}
@@ -165,7 +165,7 @@ namespace SocketServers
 					{
 						if (e.SocketError == SocketError.Success)
 						{
-							connection = new Connection<C>(socket1, receiveQueueSize);
+							connection = new Connection<C>(socket1, false, receiveQueueSize);
 							connections.Add(e.RemoteEndPoint, connection);
 							newConnection = true;
 						}
@@ -189,13 +189,13 @@ namespace SocketServers
 			}
 		}
 
-		private void Accept_Completed(object sender, SocketAsyncEventArgs acceptEventArgs)
+		private Connection<C> CreateConnection(Socket socket, SocketError error)
 		{
 			Connection<C> connection = null;
 
-			if (isRunning == true && acceptEventArgs.SocketError == SocketError.Success)
+			if (isRunning == true && error == SocketError.Success)
 			{
-				connection = new Connection<C>(acceptEventArgs.AcceptSocket, receiveQueueSize);
+				connection = new Connection<C>(socket, true, receiveQueueSize);
 				var oldConnection = connections.Replace(connection.RemoteEndPoint, connection);
 
 				if (oldConnection != null)
@@ -203,16 +203,39 @@ namespace SocketServers
 			}
 			else
 			{
-				if (acceptEventArgs.AcceptSocket != null)
-					acceptEventArgs.AcceptSocket.SafeShutdownClose();
+				if (socket != null)
+					socket.SafeShutdownClose();
 			}
 
-			if (isRunning == true)
+			return connection;
+		}
+
+		private void Accept_Completed(Socket none, ServerAsyncEventArgs e)
+		{
+			Socket acceptSocket = e.AcceptSocket;
+			SocketError error = e.SocketError;
+
+			for (; ; )
 			{
-				acceptEventArgs.AcceptSocket = recycling.Get(realEndPoint.AddressFamily);
-				if (listener.AcceptAsync(acceptEventArgs) == false)
-					Accept_Completed(listener, acceptEventArgs);
+				int backlog = Thread.VolatileRead(ref acceptBacklog);
+				if (isRunning && backlog <= minAcceptBacklog)
+				{
+					e.AcceptSocket = null;
+
+					listener.AcceptAsync(e, Accept_Completed);
+					break;
+				}
+				else
+				{
+					if (Interlocked.CompareExchange(ref acceptBacklog, backlog - 1, backlog) == backlog)
+					{
+						EventArgsManager.Put(e);
+						break;
+					}
+				}
 			}
+
+			var connection = CreateConnection(acceptSocket, error);
 
 			if (connection != null)
 				NewTcpConnection(connection);
@@ -243,10 +266,10 @@ namespace SocketServers
 				OnEndTcpConnection(connection);
 
 				if (connection.Socket.Connected)
-					try { connection.Socket.Shutdown(SocketShutdown.Send); }
+					try { connection.Socket.Shutdown(SocketShutdown.Both); }
 					catch (SocketException) { }
 
-				if (recycling.IsEnabled)
+				if (connection.IsSocketAccepted && socketReuseEnabled)
 				{
 					try
 					{
@@ -265,19 +288,36 @@ namespace SocketServers
 					}
 					catch (NotSupportedException)
 					{
-						recycling.Dispose();
+						socketReuseEnabled = false;
 					}
 				}
 
-				if (recycling.IsEnabled == false)
+				if (socketReuseEnabled == false)
 					connection.Socket.Close();
 			}
 		}
 
 		private void Disconnect_Completed(Socket socket, ServerAsyncEventArgs e)
 		{
-			EventArgsManager.Put(e);
-			recycling.Recycle(socket, realEndPoint.AddressFamily);
+			for (; ; )
+			{
+				int backlog = Thread.VolatileRead(ref acceptBacklog);
+				if (isRunning && backlog < maxAcceptBacklog)
+				{
+					if (Interlocked.CompareExchange(ref acceptBacklog, backlog + 1, backlog) == backlog)
+					{
+						e.AcceptSocket = socket;
+
+						listener.AcceptAsync(e, Accept_Completed);
+						break;
+					}
+				}
+				else
+				{
+					EventArgsManager.Put(e);
+					break;
+				}
+			}
 		}
 
 		private void Receive_Completed(Socket socket, ServerAsyncEventArgs e)
@@ -287,7 +327,7 @@ namespace SocketServers
 				Connection<C> connection;
 				connections.TryGetValue(e.RemoteEndPoint, out connection);
 
-				if (connection != null && connection.Socket == socket)
+				if (connection != null && connection.Socket == socket && connection.Id == e.ConnectionId)
 				{
 					for (; ; )
 					{
@@ -307,7 +347,7 @@ namespace SocketServers
 
 						if (close)
 						{
-							connections.Remove(connection.RemoteEndPoint);
+							connections.Remove(connection.RemoteEndPoint, connection);
 							EndTcpConnection(connection);
 
 							break;
@@ -324,6 +364,13 @@ namespace SocketServers
 							e = null;
 					}
 				}
+				else
+				{
+					if (e.BytesTransferred > 0)
+						Console.WriteLine("ERROR: {0}, conn-handle: {1}, socket-handle: {2}, ip: {3}", e.BytesTransferred,
+							(connection == null) ? "Null" : connection.Socket.Handle.ToString(), socket.Handle.ToString(),
+							e.RemoteEndPoint.ToString());
+				}
 			}
 			finally
 			{
@@ -338,7 +385,7 @@ namespace SocketServers
 
 			try
 			{
-				connection.ReceiveSpinLock.Enter();
+				connection.SpinLock.Enter();
 
 				e.SequenceNumber = connection.ReceiveQueue.SequenceNumber;
 
@@ -353,7 +400,7 @@ namespace SocketServers
 				}
 				finally
 				{
-					connection.ReceiveSpinLock.Exit();
+					connection.SpinLock.Exit();
 				}
 			}
 			catch (ObjectDisposedException)
@@ -380,7 +427,7 @@ namespace SocketServers
 			{
 				if (connection.Socket.Connected == false)
 				{
-					connections.Remove(remote);
+					connections.Remove(remote, connection);
 					EndTcpConnection(connection);
 
 					connection = null;

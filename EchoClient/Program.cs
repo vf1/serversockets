@@ -53,8 +53,13 @@ namespace EchoClient
 			Console.WriteLine(@"Sleep 5 seconds");
 			System.Threading.Thread.Sleep(5000);
 
-			MultiConnection(server1, 4096, 1);
-			MultiConnection(server1, 16, 512);
+			//for (; ; )
+			{
+				MultiConnection(server1, 1, 1024);
+				MultiConnection(server1, 4096, 1);
+				MultiConnection(server1, 512, 16);
+			//	Thread.Sleep(250000);
+			}
 			EchoTls(new IPEndPoint(server1.Address, server1.Port + 1), 64);
 			EchoTlsSpliter(new IPEndPoint(server1.Address, server1.Port + 1));
 			EchoTcp(server1);
@@ -131,7 +136,8 @@ namespace EchoClient
 
 					sockets[n].EndConnect(results[i]);
 
-					sockets[n].Send(data1);
+					if (sockets[n].Send(data1) != data1.Length)
+						Console.Write("Ooppss...");
 					TcpReceive(sockets[n], data1);
 
 					sockets[n].Close();
@@ -204,6 +210,7 @@ namespace EchoClient
 			{
 				sockets[i] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				sockets[i].Bind(new IPEndPoint((server.AddressFamily == AddressFamily.InterNetwork) ? IPAddress.Any : IPAddress.IPv6Any, 0));
+				sockets[i].ReceiveTimeout = 5000; 
 				sockets[i].Connect(server);
 			}
 

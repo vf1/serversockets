@@ -349,7 +349,7 @@ namespace SocketServers
 
 		private void Server_Failed(Server<C> server, ServerInfoEventArgs e)
 		{
-			servers.Remove(server.LocalEndPoint);
+			servers.Remove(server.LocalEndPoint, server);
 			OnServerRemoved(server);
 			OnServerInfo(e);
 		}
@@ -408,7 +408,7 @@ namespace SocketServers
 			{
 				if (server.FakeEndPoint != null)
 				{
-					fakeServers.Remove(server.FakeEndPoint);
+					fakeServers.Remove(server.FakeEndPoint, server);
 					if (ServerRemoved != null)
 						ServerRemoved(this, new ServerChangeEventArgs(server.FakeEndPoint));
 				}

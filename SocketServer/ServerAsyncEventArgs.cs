@@ -90,6 +90,7 @@ namespace SocketServers
 			ConnectionId = AnyNewConnectionId;
 			Completed = null;
 			emulatedBytesTransfred = 0;
+			AcceptSocket = null;
 
 			if (segment.Array != null && segment.Count != DefaultSize)
 				BufferManager.Free(ref segment);
@@ -196,6 +197,12 @@ namespace SocketServers
 		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
 		{
 			return serverArgs.socketArgs;
+		}
+
+		internal Socket AcceptSocket
+		{
+			get { return socketArgs.AcceptSocket; }
+			set { socketArgs.AcceptSocket = value; }
 		}
 
 		public SocketError SocketError 
@@ -350,6 +357,10 @@ namespace SocketServers
 		public void FreeBuffer()
 		{
 			BufferManager.Free(ref segment);
+
+			emulatedBytesTransfred = 0;
+	
+			socketArgs.SetBuffer(null, 0, 0);
 		}
 
 		#endregion

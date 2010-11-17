@@ -16,24 +16,29 @@ namespace SocketServers
 			: IDisposable
 			where C2 : IDisposable
 		{
-			private static volatile int connectionCount;
+			private static int connectionCount;
 			private SspiContext sspiContext;
-			private volatile int closeCount;
+			private int closeCount;
 
-			public Connection(Socket socket, int receivedQueueSize)
+			public Connection(Socket socket, bool isSocketAccepted, int receivedQueueSize)
 			{
-				Socket = socket;
-				RemoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
 				Id = NewConnectionId();
-				ReceiveQueue = new CyclicBuffer(receivedQueueSize);
-				ReceiveSpinLock = new SpinLock();
-			}
 
-#pragma warning disable 0420
+				ReceiveQueue = new CyclicBuffer(receivedQueueSize);
+				SpinLock = new SpinLock();
+
+				Socket = socket;
+				IsSocketAccepted = isSocketAccepted;
+				RemoteEndPoint = socket.RemoteEndPoint as IPEndPoint;
+			}
 
 			internal bool Close()
 			{
-				if (Interlocked.Increment(ref closeCount) == 1)
+				SpinLock.Enter();
+				bool result = Interlocked.Increment(ref closeCount) == 1;
+				SpinLock.Exit();
+
+				if (result)
 				{
 					ReceiveQueue.Dispose();
 
@@ -45,18 +50,14 @@ namespace SocketServers
 
 					if (UserConnection != null)
 						UserConnection.Dispose();
-
-					return true;
 				}
 
-				return false;
+				return result;
 			}
-
-#pragma warning restore 0420
 
 			internal bool IsClosed
 			{
-				get { return closeCount > 0; }
+				get { return Thread.VolatileRead(ref closeCount) > 0; }
 			}
 
 			void IDisposable.Dispose()
@@ -67,7 +68,8 @@ namespace SocketServers
 
 			public readonly int Id;
 			public readonly Socket Socket;
-			public readonly SpinLock ReceiveSpinLock;
+			public readonly bool IsSocketAccepted;
+			public readonly SpinLock SpinLock;
 			public readonly CyclicBuffer ReceiveQueue;
 			public readonly IPEndPoint RemoteEndPoint;
 			public C2 UserConnection;
@@ -82,8 +84,6 @@ namespace SocketServers
 				}
 			}
 
-#pragma warning disable 0420
-
 			private int NewConnectionId()
 			{
 				int connectionId;
@@ -91,14 +91,12 @@ namespace SocketServers
 				{
 					connectionId = Interlocked.Increment(ref connectionCount);
 				} while (
-					connectionId == ServerAsyncEventArgs.AnyNewConnectionId || 
+					connectionId == ServerAsyncEventArgs.AnyNewConnectionId ||
 					connectionId == ServerAsyncEventArgs.AnyConnectionId
 					);
 
 				return connectionId;
 			}
-
-#pragma warning restore 0420
 
 			#region class CyclicBuffer {...}
 

@@ -40,5 +40,12 @@ namespace SocketServers
 			if (socket.ConnectAsync(e) == false)
 				e.OnCompleted(socket);
 		}
+
+		public static void AcceptAsync(this Socket socket, ServerAsyncEventArgs e, ServerAsyncEventArgs.CompletedEventHandler handler)
+		{
+			e.Completed = handler;
+			if (socket.AcceptAsync(e) == false)
+				e.OnCompleted(socket);
+		}
 	}
 }

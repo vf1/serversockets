@@ -43,8 +43,7 @@ namespace SocketServers
 					if (index < 0)
 						return -1;
 
-					// or Interlocked.Read(ref array[index].Next) ?
-					UInt64 xchg = (UInt64)array[index].Next & 0xFFFFFFFFUL | head1 & 0xFFFFFFFF00000000UL;
+					UInt64 xchg = (UInt64)Thread.VolatileRead(ref array[index].Next) & 0xFFFFFFFFUL | head1 & 0xFFFFFFFF00000000UL;
 					UInt64 head2 = (UInt64)Interlocked.CompareExchange(ref s.Head, (Int64)xchg, (Int64)head1);
 
 					if (head1 == head2)

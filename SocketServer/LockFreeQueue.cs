@@ -53,7 +53,7 @@ namespace SocketServers
 			set
 			{
 				dequeuePredicate = value;
-				q.HasDequeuePredicate = dequeuePredicate == null;
+				q.HasDequeuePredicate = dequeuePredicate != null;
 			}
 		}
 

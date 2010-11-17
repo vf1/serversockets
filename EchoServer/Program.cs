@@ -43,7 +43,7 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate, RequseSocketPoolSizePerServer = 1024 });
+			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate, });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{
@@ -129,7 +129,12 @@ namespace EchoServer
 			GC.Collect();
 			GC.WaitForPendingFinalizers();
 
-			System.Threading.Thread.Sleep(2000);
+			for (int i = 0; i < 50; i++)
+			{
+				if (serversManager.BuffersPool.Created == serversManager.BuffersPool.Queued)
+					break;
+				System.Threading.Thread.Sleep(500);
+			}
 
 			if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
 			{
@@ -150,6 +155,8 @@ namespace EchoServer
 
 		static void ServersManager_Sent(ServersManager<BaseConnection> server, ref ServerAsyncEventArgs e)
 		{
+			if (e.SocketError != SocketError.Success)
+				Console.WriteLine("Sent error: {0}", e.SocketError.ToString());
 		}
 
 		static void ServersManager_ServerRemoved(object sender, ServerChangeEventArgs e)

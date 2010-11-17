@@ -7,16 +7,22 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace SocketServers
 {
-	public struct ServersManagerConfig
+	public class ServersManagerConfig
 	{
+		public ServersManagerConfig()
+		{
+			TcpMinAcceptBacklog = 1024;
+			TcpMaxAcceptBacklog = 2048;
+			TcpQueueSize = 8;
+		}
+
 		public int MinPort;
 		public int MaxPort;
 		public int UdpQueueSize;
+		public int TcpMinAcceptBacklog;
+		public int TcpMaxAcceptBacklog;
 		public int TcpOffsetOffset;
 		public int TcpQueueSize;
-		public int TcpAcceptQueueSize;
 		public X509Certificate2 TlsCertificate;
-		public int RequseSocketPoolSizePerServer;
-		public bool ReuseSocketForConnect;
 	}
 }

@@ -13,7 +13,7 @@ namespace SocketServers
 		: IDisposable
 		where C : BaseConnection, new()
 	{
-		protected bool isRunning;
+		protected volatile bool isRunning;
 		protected ServerEndPoint realEndPoint;
 		private ServerEndPoint fakeEndPoint;
 		private long ip4Mask;

@@ -9,6 +9,7 @@ using System.Threading;
 namespace SocketServers
 {
 	class SafeDictionary<K, T>
+		where T : class
 	{
 		private ReaderWriterLockSlim sync;
 		private Dictionary<K, T> dictionary;
@@ -74,13 +75,19 @@ namespace SocketServers
 			}
 		}
 
-		public bool Remove(K key)
+		public bool Remove(K key, T value)
 		{
-			bool result;
+			bool result = false;
 			try
 			{
 				sync.EnterWriteLock();
-				result = dictionary.Remove(key);
+
+				T dictValue;
+				if (dictionary.TryGetValue(key, out dictValue))
+				{
+					if (dictValue == value)
+						result = dictionary.Remove(key);
+				}
 			}
 			finally
 			{
