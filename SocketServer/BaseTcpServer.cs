@@ -364,6 +364,7 @@ namespace SocketServers
 							e = null;
 					}
 				}
+#if DEBUG
 				else
 				{
 					if (e.BytesTransferred > 0)
@@ -371,6 +372,7 @@ namespace SocketServers
 							(connection == null) ? "Null" : connection.Socket.Handle.ToString(), socket.Handle.ToString(),
 							e.RemoteEndPoint.ToString());
 				}
+#endif
 			}
 			finally
 			{
