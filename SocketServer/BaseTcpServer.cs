@@ -308,7 +308,14 @@ namespace SocketServers
 					{
 						e.AcceptSocket = socket;
 
-						listener.AcceptAsync(e, Accept_Completed);
+						try
+						{
+							listener.AcceptAsync(e, Accept_Completed);
+						}
+						catch
+						{
+							EventArgsManager.Put(e);
+						}
 						break;
 					}
 				}

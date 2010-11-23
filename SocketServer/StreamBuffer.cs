@@ -27,6 +27,11 @@ namespace SocketServers
 			get { return Used; }
 		}
 
+		//public ArraySegment<byte> GetUsedArraySegment()
+		//{
+		//    return new ArraySegment<byte>(segment.Array, 
+		//}
+
 		public bool Resize(int maxSize)
 		{
 			if (maxSize > BufferManager.MaxSize)

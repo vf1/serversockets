@@ -84,6 +84,8 @@ namespace EchoServer
 
 			/////////////////////////////////////////////////////////////////////////
 
+			//CreateSomeGarbage(serversManager);
+
 			Console.WriteLine(@"Press any key to stop server...");
 
 			while (Console.KeyAvailable == false)
@@ -126,22 +128,46 @@ namespace EchoServer
 
 			/////////////////////////////////////////////////////////////////////////
 
-			GC.Collect();
-			GC.WaitForPendingFinalizers();
+			//CreateSomeGarbage(serversManager);
 
-			for (int i = 0; i < 50; i++)
+			for (int i = 0; i < 240; i++)
 			{
 				if (serversManager.BuffersPool.Created == serversManager.BuffersPool.Queued)
 					break;
-				System.Threading.Thread.Sleep(500);
+				Console.Write("\rWaiting for buffers: {0} seconds", i / 2);
+				Thread.Sleep(500);
 			}
+			Console.WriteLine();
 
 			if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
 			{
 				Console.WriteLine(@"Lost buffers:");
 				Console.WriteLine(@"  Buffers Created : {0}", serversManager.BuffersPool.Created);
 				Console.WriteLine(@"  Buffers Queued  : {0}", serversManager.BuffersPool.Queued);
+
+				Console.WriteLine("  GC for gen #0 {0}, #1 {1}, #2 {2}", GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
+				Console.Write(@"  Trying to garbage lost buffers...");
+				GC.Collect();
+				GC.WaitForPendingFinalizers();
+				GC.Collect();
+				if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
+				{
+					Console.WriteLine("Failed {0}", serversManager.BuffersPool.Created - serversManager.BuffersPool.Queued);
+					Console.WriteLine("  GC for gen #0 {0}, #1 {1}, #2 {2}", GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
+				}
+				else
+					Console.WriteLine("Ok");
+				Console.ReadKey(true);
 			}
+		}
+
+		static void CreateSomeGarbage(ServersManager<BaseConnection> serversManager)
+		{
+			serversManager.BuffersPool.Get();
+			serversManager.BuffersPool.Get();
+			serversManager.BuffersPool.Get();
+			serversManager.BuffersPool.Get();
+			serversManager.BuffersPool.Get();
 		}
 
 		static bool ServersManager_Received(ServersManager<BaseConnection> server, BaseConnection c, ref ServerAsyncEventArgs e)

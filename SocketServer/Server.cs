@@ -26,8 +26,8 @@ namespace SocketServers
 		public ServerEventHandlerVal<Server<C>, ServerInfoEventArgs> Failed;
 		public ServerEventHandlerRef<Server<C>, C, ServerAsyncEventArgs, bool> Received;
 		public ServerEventHandlerVal<Server<C>, ServerAsyncEventArgs> Sent;
-		public ServerEventHandlerVal<Server<C>, BaseConnection> NewConnection;
-		public ServerEventHandlerVal<Server<C>, BaseConnection> EndConnection;
+		public ServerEventHandlerVal<Server<C>, C> NewConnection;
+		public ServerEventHandlerVal<Server<C>, C> EndConnection;
 
 		public abstract void Start();
 		public abstract void Dispose();

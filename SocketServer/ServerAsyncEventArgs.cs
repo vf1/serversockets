@@ -15,8 +15,6 @@ namespace SocketServers
 		, ILockFreePoolItem
 		, IDisposable
 	{
-		public const int DefaultUserToken1 = -1;
-		public const object DefaultUserToken2 = null;
 		public const int AnyNewConnectionId = -1;
 		public const int AnyConnectionId = -2;
 		public const int DefaultSize = 4096;
@@ -27,7 +25,7 @@ namespace SocketServers
 		private int emulatedBytesTransfred;
 
 #if EVENTARGS_TRACING
-		private List<string> tracing;
+		private List<string> tracing = new List<string>();
 #endif
 
 		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
@@ -43,24 +41,28 @@ namespace SocketServers
 			socketArgs.Completed += SocketArgs_Completed;
 
 			SetDefaultValue();
-
-#if EVENTARGS_TRACING
-			tracing = new List<string>();
-#endif
 		}
 
-#if DISABLED_FOR_OPTIMIZATION
+#if I_HAVE_A_LOT_TIME_TO_INVESTOGNATE_THIS_ISSUE
+
+		// 1. gc call finalizer several times in some cases w/o dummy static link
+		// 2. sometimes strange internal .net error ocurs after resurrection
+		// 3. This requre to use finalization queue for each object -> decrese performance?!
+		// 4. Does not it work because of SocketAsyncEventArgs is pinned after async method?! - No, pinned struct wrapped by S...Args
+
+		private static ServerAsyncEventArgs[] gcFix=new ServerAsyncEventArgs[1024];
+		private static int gcFixCount = 0;
+
 		~ServerAsyncEventArgs()
 		{
-		    if (isPooled)
-		    {
-		        BufferManager.Free(ref segment);
-		    }
-		    else
-		    {
-		        GC.ReRegisterForFinalize(this);
-		        EventArgsManager.Put(this);
-		    }
+			gcFix[System.Threading.Interlocked.Increment(ref gcFixCount) % gcFix.Length] = this;
+
+			bool reRegisterForFinalize = !isPooled;
+
+			Dispose();
+
+			if (reRegisterForFinalize)
+				GC.ReRegisterForFinalize(this);
 		}
 #endif
 
@@ -69,6 +71,7 @@ namespace SocketServers
 			if (isPooled)
 			{
 				BufferManager.Free(ref segment);
+				socketArgs.Dispose();
 			}
 			else
 			{
@@ -80,13 +83,13 @@ namespace SocketServers
 
 		bool ILockFreePoolItem.IsPooled
 		{
-			set { isPooled = value; }
+			set { Trace(); isPooled = value; }
 		}
 
 		public void SetDefaultValue()
 		{
-			UserToken1 = DefaultUserToken1;
-			UserToken2 = DefaultUserToken2;
+			Trace();
+
 			ConnectionId = AnyNewConnectionId;
 			Completed = null;
 			emulatedBytesTransfred = 0;
@@ -101,31 +104,33 @@ namespace SocketServers
 		#region Tracing
 
 #if EVENTARGS_TRACING
-        ~ServerAsyncEventArgs()
-        {
-            if (isPooled == false)
-            {
-                Console.WriteLine("Lost ServerAsyncEventArgs: {0}", GetTracingPath());
-            }
-        }
-#endif
-
-		[Conditional("EVENTARGS_TRACING")]
-		public void Trace(string place)
+		~ServerAsyncEventArgs()
 		{
-#if EVENTARGS_TRACING
-			tracing.Add(place);
-#endif
+			if (isPooled == false)
+			{
+				using (var file = System.IO.File.AppendText("lost.txt"))
+					file.WriteLine(GetTracingPath());
+			}
 		}
+#endif
 
 		[Conditional("EVENTARGS_TRACING")]
 		public void Trace()
 		{
 #if EVENTARGS_TRACING
-			var stackTrace = new StackTrace();
+			var stackTrace = new StackTrace(0);
 
-			//stackTrace.GetFrame(1).GetMethod().DeclaringType.Name + @":" 
-			tracing.Add(stackTrace.GetFrame(1).GetMethod().Name);
+			for (int i = 0; i < stackTrace.FrameCount; i++)
+			{
+				var method = stackTrace.GetFrame(i).GetMethod();
+
+				if (method.DeclaringType != typeof(ServerAsyncEventArgs)/* && method.Module.Name == @"SocketServers.dll"*/)
+				{
+					if (tracing.Count == 0 || tracing[tracing.Count - 1] != method.Name)
+						tracing.Add(method.Name);
+					break;
+				}
+			}
 #endif
 		}
 
@@ -143,7 +148,7 @@ namespace SocketServers
 			string path = "";
 
 			foreach (var item in tracing)
-				path += "[" + item + "]->";
+				path += "->[" + item + "]";
 
 			return path;
 #else
@@ -154,18 +159,6 @@ namespace SocketServers
 		#endregion
 
 		public ServerEndPoint LocalEndPoint
-		{
-			get;
-			set;
-		}
-
-		public int UserToken1
-		{
-			get;
-			set;
-		}
-
-		public object UserToken2
 		{
 			get;
 			set;
@@ -186,10 +179,11 @@ namespace SocketServers
 			RemoteEndPoint = e.RemoteEndPoint;
 		}
 
-		public void TransferData(byte[] buffer, int offset, int size)
+		public void CopyAddressesFrom(BaseConnection c)
 		{
-			System.Buffer.BlockCopy(buffer, offset, Buffer, Offset, size);
-			socketArgs.SetBuffer(Offset + size, Count - size);
+			ConnectionId = c.Id;
+			LocalEndPoint = c.LocalEndPoint;
+			RemoteEndPoint = c.RemoteEndPoint;
 		}
 
 		#region SocketAsyncEventArgs
@@ -201,24 +195,26 @@ namespace SocketServers
 
 		internal Socket AcceptSocket
 		{
-			get { return socketArgs.AcceptSocket; }
-			set { socketArgs.AcceptSocket = value; }
+			get { Trace(); return socketArgs.AcceptSocket; }
+			set { Trace(); socketArgs.AcceptSocket = value; }
 		}
 
-		public SocketError SocketError 
+		public SocketError SocketError
 		{
-			get { return socketArgs.SocketError; }
-			internal set { socketArgs.SocketError = value; }
+			get { Trace(); return socketArgs.SocketError; }
+			internal set { Trace(); socketArgs.SocketError = value; }
 		}
 
 		public IPEndPoint RemoteEndPoint
 		{
 			get
 			{
+				Trace();
 				return socketArgs.RemoteEndPoint as IPEndPoint;
 			}
 			set
 			{
+				Trace();
 				if ((socketArgs.RemoteEndPoint as IPEndPoint).Equals(value) == false)
 				{
 					(socketArgs.RemoteEndPoint as IPEndPoint).Address = new IPAddress(value.Address.GetAddressBytes());
@@ -229,18 +225,19 @@ namespace SocketServers
 
 		public void SetAnyRemote(AddressFamily family)
 		{
+			Trace();
 			if (family == AddressFamily.InterNetwork)
 				RemoteEndPoint.Address = IPAddress.Any;
 			else
 				RemoteEndPoint.Address = IPAddress.IPv6Any;
-			
+
 			RemoteEndPoint.Port = 0;
 		}
 
 		public bool DisconnectReuseSocket
 		{
-			get { return socketArgs.DisconnectReuseSocket; }
-			set { socketArgs.DisconnectReuseSocket = value; }
+			get { Trace(); return socketArgs.DisconnectReuseSocket; }
+			set { Trace(); socketArgs.DisconnectReuseSocket = value; }
 		}
 
 		#endregion
@@ -249,41 +246,43 @@ namespace SocketServers
 
 		public int OffsetOffset
 		{
-			get { return socketArgs.Offset - segment.Offset; }
+			get { Trace(); return socketArgs.Offset - segment.Offset; }
 		}
 
 		public int Offset
 		{
-			get { return socketArgs.Offset; }
+			get { Trace(); return socketArgs.Offset; }
 		}
 
 		public byte[] Buffer
 		{
-			get { return socketArgs.Buffer; }
+			get { Trace(); return socketArgs.Buffer; }
 		}
 
 		public int BufferCapacity
 		{
-			get { return (segment.IsValid()) ? segment.Count : DefaultSize; }
+			get { Trace(); return (segment.IsValid()) ? segment.Count : DefaultSize; }
 		}
 
 		public int Count
 		{
-			get { return socketArgs.Count; }
+			get { Trace(); return socketArgs.Count; }
 		}
 
 		public int BytesTransferred
 		{
-			get { return socketArgs.BytesTransferred + emulatedBytesTransfred; }
+			get { Trace(); return socketArgs.BytesTransferred + emulatedBytesTransfred; }
 		}
 
 		public void SetBufferMax()
 		{
+			Trace();
 			SetBuffer(0, BufferCapacity);
 		}
 
 		public void SetBufferMax(int offsetOffset)
 		{
+			Trace();
 #if DEBUG
 			if (offsetOffset >= BufferCapacity)
 				throw new ArgumentOutOfRangeException(@"SetBuffer offsetOffset <= BufferCapacity");
@@ -293,6 +292,7 @@ namespace SocketServers
 
 		public void SetBuffer(int offsetOffset, int count)
 		{
+			Trace();
 #if DEBUG
 			if (count <= 0)
 				throw new ArgumentOutOfRangeException(@"SetBuffer count <= 0");
@@ -313,6 +313,8 @@ namespace SocketServers
 
 		public void ResizeBufferCount(int offset, int count)
 		{
+			Trace();
+
 			if (offset < segment.Offset)
 				throw new ArgumentOutOfRangeException(@"offset");
 
@@ -337,6 +339,7 @@ namespace SocketServers
 
 		public void ResizeBufferTransfered(int offset, int bytesTransfred)
 		{
+			Trace();
 			if (offset < segment.Offset)
 				throw new ArgumentOutOfRangeException(@"offset");
 
@@ -344,22 +347,41 @@ namespace SocketServers
 			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
 
-		public void EmulateTransfer(ArraySegment<byte> newSegment, int offset, int bytesTransfred)
+		public void SetBufferTransferred(StreamBuffer buffer)
 		{
+			Trace();
+			var newSegment = buffer.Detach();
+			int bytesTransfred = buffer.Count;
+
 			BufferManager.Free(ref segment);
 
 			segment = newSegment;
-			socketArgs.SetBuffer(segment.Array, offset, segment.Count + offset - segment.Offset);
+			socketArgs.SetBuffer(segment.Array, segment.Offset, segment.Count);
 
 			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
 
-		public void FreeBuffer()
+		internal void EmulateTransfer(ArraySegment<byte> newSegment, int offset, int bytesTransfred)
 		{
+			Trace();
+			if (offset < segment.Offset)
+				throw new ArgumentOutOfRangeException(@"offset");
+
+			BufferManager.Free(ref segment);
+
+			segment = newSegment;
+			socketArgs.SetBuffer(segment.Array, offset, segment.Count - (segment.Offset - offset));
+
+			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
+		}
+
+		internal void FreeBuffer()
+		{
+			Trace();
 			BufferManager.Free(ref segment);
 
 			emulatedBytesTransfred = 0;
-	
+
 			socketArgs.SetBuffer(null, 0, 0);
 		}
 

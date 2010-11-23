@@ -53,8 +53,8 @@ namespace SocketServers
 		public event EventHandler<ServerInfoEventArgs> ServerInfo;
 		public event ServerEventHandlerRef<ServersManager<C>, C, ServerAsyncEventArgs, bool> Received;
 		public event ServerEventHandlerRef<ServersManager<C>, ServerAsyncEventArgs> Sent;
-		public event ServerEventHandlerVal<ServersManager<C>, BaseConnection> NewConnection;
-		public event ServerEventHandlerVal<ServersManager<C>, BaseConnection> EndConnection;
+		public event ServerEventHandlerVal<ServersManager<C>, C> NewConnection;
+		public event ServerEventHandlerVal<ServersManager<C>, C> EndConnection;
 
 		private static bool DefaultAddressPredicate(NetworkInterface interface1, IPInterfaceProperties properties, UnicastIPAddressInformation addrInfo)
 		{
@@ -354,7 +354,7 @@ namespace SocketServers
 			OnServerInfo(e);
 		}
 
-		private void Server_NewConnection(Server<C> server, BaseConnection e)
+		private void Server_NewConnection(Server<C> server, C e)
 		{
 			try
 			{
@@ -367,7 +367,7 @@ namespace SocketServers
 			}
 		}
 
-		private void Server_EndConnection(Server<C> server, BaseConnection e)
+		private void Server_EndConnection(Server<C> server, C e)
 		{
 			try
 			{

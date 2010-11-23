@@ -1,13 +1,13 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketServers", "SocketServer\SocketServers.csproj", "{972538DE-E785-484D-8FC6-A5748817833D}"
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketServers", "SocketServer\SocketServers.VS2008.csproj", "{972538DE-E785-484D-8FC6-A5748817833D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoServer", "EchoServer\EchoServer.csproj", "{CE917079-F424-4EA4-ACEF-DC4D87D4C96D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoServer", "EchoServer\EchoServer.VS2008.csproj", "{CE917079-F424-4EA4-ACEF-DC4D87D4C96D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoClient", "EchoClient\EchoClient.csproj", "{7B3C5AA1-1D75-4A1C-9E38-A0D97A2A29E6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EchoClient", "EchoClient\EchoClient.VS2008.csproj", "{7B3C5AA1-1D75-4A1C-9E38-A0D97A2A29E6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BufferPoolTest", "BufferPoolTest\BufferPoolTest.csproj", "{81BAAF09-59C4-4BA1-B29B-7718FC3B6AFA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BufferPoolTest", "BufferPoolTest\BufferPoolTest.VS2008.csproj", "{81BAAF09-59C4-4BA1-B29B-7718FC3B6AFA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
