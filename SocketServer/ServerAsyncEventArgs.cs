@@ -343,7 +343,7 @@ namespace SocketServers
 			if (offset < segment.Offset)
 				throw new ArgumentOutOfRangeException(@"offset");
 
-			socketArgs.SetBuffer(offset, socketArgs.Count);
+			socketArgs.SetBuffer(offset, socketArgs.Count - (offset - segment.Offset));
 			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
 
@@ -370,7 +370,7 @@ namespace SocketServers
 			BufferManager.Free(ref segment);
 
 			segment = newSegment;
-			socketArgs.SetBuffer(segment.Array, offset, segment.Count - (segment.Offset - offset));
+			socketArgs.SetBuffer(segment.Array, offset, segment.Count - (offset - segment.Offset));
 
 			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
 		}
