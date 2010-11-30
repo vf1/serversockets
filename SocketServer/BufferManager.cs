@@ -39,6 +39,12 @@ namespace SocketServers
 			}
 		}
 
+		internal static void Free(ArraySegment<byte> segment)
+		{
+			if (segment.IsValid())
+				pool.Free(segment);
+		}
+
 		public static long MaxMemoryUsage
 		{
 			get { return pool.MaxMemoryUsage; }

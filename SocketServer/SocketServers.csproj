@@ -115,11 +115,28 @@
     </BootstrapperPackage>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
+  <!--  
+  <Import Project="$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"/>
+  <Import Project="$(MSBuildExtensionsPath)\ExtensionPack\MSBuild.ExtensionPack.tasks"/>
+  <Target Name="AfterBuild" DependsOnTargets="BuildZip">
   </Target>
-  <Target Name="AfterBuild">
+  <Target Name="BuildZip" Condition="'$(Configuration)' == 'Release'">
+    <Assembly TaskAction="GetInfo" NetAssembly="$(OutputPath)SocketServers.dll">
+      <Output TaskParameter="OutputItems" ItemName="Info"/>
+    </Assembly>
+    <TextString TaskAction="Split" String1="%(Info.AssemblyVersion)" String2="." StartIndex="0">
+      <Output PropertyName="Major" TaskParameter="NewString"/>
+    </TextString>
+    <MSBuild.ExtensionPack.Framework.TextString TaskAction="Split" String1="%(Info.AssemblyVersion)" String2="." StartIndex="1">
+      <Output PropertyName="Minor" TaskParameter="NewString"/>
+    </MSBuild.ExtensionPack.Framework.TextString>
+    <ItemGroup>
+      <ZipFiles Include="$(OutputPath)SocketServers.dll" />
+    </ItemGroup>
+    <Zip Files="@(ZipFiles)"
+         Flatten="True"
+         ZipFileName="$(OutputPath)SocketServers.$(Major).$(Minor).zip"
+         ZipLevel="9" />
   </Target>
-  -->
+   -->
 </Project>

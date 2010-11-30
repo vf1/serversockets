@@ -172,7 +172,7 @@ namespace EchoServer
 
 		static bool ServersManager_Received(ServersManager<BaseConnection> server, BaseConnection c, ref ServerAsyncEventArgs e)
 		{
-			e.SetBuffer(e.OffsetOffset, e.BytesTransferred);
+			e.Count = e.BytesTransferred;
 			server.SendAsync(e);
 			e = null;
 

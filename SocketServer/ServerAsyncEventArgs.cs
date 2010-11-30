@@ -20,9 +20,12 @@ namespace SocketServers
 		public const int DefaultSize = 4096;
 
 		private bool isPooled;
-		private SocketAsyncEventArgs socketArgs;
+
+		private int count;
+		private int offsetOffset;
+		private int bytesTransfered;
 		private ArraySegment<byte> segment;
-		private int emulatedBytesTransfred;
+		private SocketAsyncEventArgs socketArgs;
 
 #if EVENTARGS_TRACING
 		private List<string> tracing = new List<string>();
@@ -92,11 +95,14 @@ namespace SocketServers
 
 			ConnectionId = AnyNewConnectionId;
 			Completed = null;
-			emulatedBytesTransfred = 0;
 			AcceptSocket = null;
 
 			if (segment.Array != null && segment.Count != DefaultSize)
 				BufferManager.Free(ref segment);
+
+			count = DefaultSize;
+			offsetOffset = 0;
+			bytesTransfered = 0;
 		}
 
 		#endregion
@@ -190,6 +196,18 @@ namespace SocketServers
 
 		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
 		{
+			if (serverArgs.Count > 0)
+			{
+				serverArgs.AllocateBuffer();
+				serverArgs.ValidateBufferSettings();
+				serverArgs.socketArgs.SetBuffer(serverArgs.Buffer, serverArgs.Offset, serverArgs.Count);
+			}
+			else
+			{
+				serverArgs.socketArgs.SetBuffer(null, -1, -1);
+			}
+			
+			
 			return serverArgs.socketArgs;
 		}
 
@@ -242,147 +260,146 @@ namespace SocketServers
 
 		#endregion
 
-		#region Buffer functions
+		#region Buffer relayted
 
 		public int OffsetOffset
 		{
-			get { Trace(); return socketArgs.Offset - segment.Offset; }
+			get { Trace(); return offsetOffset; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"OffsetOffset can not be negative number");
+#endif
+				offsetOffset = value;
+			}
 		}
 
 		public int Offset
 		{
-			get { Trace(); return socketArgs.Offset; }
-		}
-
-		public byte[] Buffer
-		{
-			get { Trace(); return socketArgs.Buffer; }
-		}
-
-		public int BufferCapacity
-		{
-			get { Trace(); return (segment.IsValid()) ? segment.Count : DefaultSize; }
+			get { Trace(); return segment.Offset + offsetOffset; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (segment.IsInvalid())
+					throw new ArgumentOutOfRangeException(@"Call AllocateBuffer() before change Offset value");
+				if (Offset < segment.Offset)
+					throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
+#endif
+				offsetOffset = value - segment.Offset;
+			}
 		}
 
 		public int Count
 		{
-			get { Trace(); return socketArgs.Count; }
+			get { Trace(); return count; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"Count can not be negative number");
+#endif
+				count = value;
+			}
 		}
 
 		public int BytesTransferred
 		{
-			get { Trace(); return socketArgs.BytesTransferred + emulatedBytesTransfred; }
-		}
-
-		public void SetBufferMax()
-		{
-			Trace();
-			SetBuffer(0, BufferCapacity);
-		}
-
-		public void SetBufferMax(int offsetOffset)
-		{
-			Trace();
+			get { Trace(); return bytesTransfered; }
+			set
+			{
+				Trace();
 #if DEBUG
-			if (offsetOffset >= BufferCapacity)
-				throw new ArgumentOutOfRangeException(@"SetBuffer offsetOffset <= BufferCapacity");
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"BytesTransferred can not be negative number");
 #endif
-			SetBuffer(offsetOffset, BufferCapacity - offsetOffset);
-		}
-
-		public void SetBuffer(int offsetOffset, int count)
-		{
-			Trace();
-#if DEBUG
-			if (count <= 0)
-				throw new ArgumentOutOfRangeException(@"SetBuffer count <= 0");
-#endif
-
-			emulatedBytesTransfred = 0;
-
-			if (socketArgs.Buffer != null && (offsetOffset + count) <= segment.Count)
-				socketArgs.SetBuffer(segment.Offset + offsetOffset, count);
-			else
-			{
-				BufferManager.Free(ref segment);
-				segment = BufferManager.Allocate(offsetOffset + count);
-
-				socketArgs.SetBuffer(segment.Array, segment.Offset + offsetOffset, count);
+				bytesTransfered = value;
 			}
 		}
 
-		public void ResizeBufferCount(int offset, int count)
+		public ArraySegment<byte> ArraySegment
 		{
-			Trace();
-
-			if (offset < segment.Offset)
-				throw new ArgumentOutOfRangeException(@"offset");
-
-			int offsetOffset = offset - segment.Offset;
-
-			if ((offsetOffset + count) > segment.Count)
+			get { return segment; }
+			set
 			{
-				var segment2 = BufferManager.Allocate(offsetOffset + count);
-
-				System.Buffer.BlockCopy(segment.Array, 0, segment2.Array, 0, segment.Count);
-
-				BufferManager.Free(ref segment);
-				segment = segment2;
-
-				socketArgs.SetBuffer(segment.Array, segment.Offset + offsetOffset, count);
-			}
-			else
-			{
-				socketArgs.SetBuffer(segment.Offset + offsetOffset, count);
+				BufferManager.Free(segment);
+				segment = value;
 			}
 		}
 
-		public void ResizeBufferTransfered(int offset, int bytesTransfred)
+		public byte[] Buffer
 		{
-			Trace();
-			if (offset < segment.Offset)
-				throw new ArgumentOutOfRangeException(@"offset");
+			get 
+			{ 
+				Trace();
 
-			socketArgs.SetBuffer(offset, socketArgs.Count - (offset - segment.Offset));
-			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
+				if (segment.Array == null)
+					ReAllocateBuffer(false);
+
+				return segment.Array; 
+			}
 		}
 
-		public void SetBufferTransferred(StreamBuffer buffer)
+		public void AllocateBuffer()
 		{
 			Trace();
-			var newSegment = buffer.Detach();
-			int bytesTransfred = buffer.Count;
 
-			BufferManager.Free(ref segment);
-
-			segment = newSegment;
-			socketArgs.SetBuffer(segment.Array, segment.Offset, segment.Count);
-
-			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
+			ReAllocateBuffer(false);
 		}
 
-		internal void EmulateTransfer(ArraySegment<byte> newSegment, int offset, int bytesTransfred)
+		public void ReAllocateBuffer(bool keepData)
 		{
 			Trace();
-			if (offset < segment.Offset)
-				throw new ArgumentOutOfRangeException(@"offset");
 
-			BufferManager.Free(ref segment);
+			if (offsetOffset + count > segment.Count)
+			{
+				var newSegment = BufferManager.Allocate(offsetOffset + count);
 
-			segment = newSegment;
-			socketArgs.SetBuffer(segment.Array, offset, segment.Count - (offset - segment.Offset));
+				if (keepData && segment.IsValid())
+					System.Buffer.BlockCopy(segment.Array, segment.Offset, newSegment.Array, newSegment.Offset, segment.Count);
 
-			emulatedBytesTransfred = bytesTransfred - socketArgs.BytesTransferred;
+				ArraySegment = newSegment;
+			}
 		}
 
-		internal void FreeBuffer()
+		public void FreeBuffer()
 		{
 			Trace();
+
 			BufferManager.Free(ref segment);
+			Count = 0;
+		}
 
-			emulatedBytesTransfred = 0;
 
-			socketArgs.SetBuffer(null, 0, 0);
+		[Conditional("DEBUG")]
+		internal void ValidateBufferSettings()
+		{
+			if (Offset < segment.Offset)
+				throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
+
+			if (OffsetOffset >= segment.Count)
+				throw new ArgumentOutOfRangeException(@"OffsetOffset is bigger than segment.Count");
+
+			if (BytesTransferred >= segment.Count)
+				throw new ArgumentOutOfRangeException(@"BytesTransferred is bigger than segment.Count");
+
+			if (OffsetOffset + Count > segment.Count)
+				throw new ArgumentOutOfRangeException(@"Invalid buffer settings: OffsetOffset + Count is bigger than segment.Count");
+		}
+
+		public void AttachBuffer(StreamBuffer buffer)
+		{
+			Trace();
+
+			OffsetOffset = 0;
+			BytesTransferred = buffer.BytesTransferred;
+
+			ArraySegment = buffer.Detach();
+
+			Count = segment.Count;
 		}
 
 		#endregion
@@ -400,6 +417,9 @@ namespace SocketServers
 		private static void SocketArgs_Completed(object sender, SocketAsyncEventArgs e)
 		{
 			var serverArgs = e.UserToken as ServerAsyncEventArgs;
+
+			serverArgs.bytesTransfered = e.BytesTransferred;
+
 			serverArgs.Completed(sender as Socket, serverArgs);
 		}
 

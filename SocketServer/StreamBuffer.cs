@@ -24,20 +24,16 @@ namespace SocketServers
 
 		public int Count
 		{
-			get { return Used; }
+			get;
+			private set;
 		}
-
-		//public ArraySegment<byte> GetUsedArraySegment()
-		//{
-		//    return new ArraySegment<byte>(segment.Array, 
-		//}
 
 		public bool Resize(int maxSize)
 		{
 			if (maxSize > BufferManager.MaxSize)
 				return false;
 
-			if (maxSize < Used)
+			if (maxSize < Count)
 				return false;
 
 			MaxSize = maxSize;
@@ -49,7 +45,7 @@ namespace SocketServers
 
 				if (old.IsValid())
 				{
-					Buffer.BlockCopy(old.Array, old.Offset, segment.Array, segment.Offset, Used);
+					Buffer.BlockCopy(old.Array, old.Offset, segment.Array, segment.Offset, Count);
 					BufferManager.Free(ref old);
 				}
 			}
@@ -59,7 +55,7 @@ namespace SocketServers
 
 		public void Free()
 		{
-			Used = 0;
+			Count = 0;
 			BufferManager.Free(ref segment);
 		}
 
@@ -74,10 +70,9 @@ namespace SocketServers
 			private set;
 		}
 
-		public int Used
+		public int BytesTransferred
 		{
-			get;
-			private set;
+			get { return Count; }
 		}
 
 		public bool CopyTransferredFrom(ServerAsyncEventArgs e, int skipBytes)
@@ -110,14 +105,17 @@ namespace SocketServers
 
 		public bool CopyFrom(byte[] array, int offset, int count)
 		{
-			if (count > MaxSize - Used)
+			if (count > MaxSize - Count)
 				return false;
+
+			if (count == 0)
+				return true;
 
 			Create();
 
-			Buffer.BlockCopy(array, offset, segment.Array, segment.Offset + Used, count);
+			Buffer.BlockCopy(array, offset, segment.Array, segment.Offset + Count, count);
 
-			Used += count;
+			Count += count;
 
 			return true;
 		}
@@ -127,7 +125,7 @@ namespace SocketServers
 			Buffer.BlockCopy(segment.Array, segment.Offset + offsetOffset, 
 				segment.Array, segment.Offset, count);
 
-			Used = count;
+			Count = count;
 		}
 
 		internal ArraySegment<byte> Detach()
@@ -135,6 +133,7 @@ namespace SocketServers
 			var segment1 = segment;
 
 			segment = new ArraySegment<byte>();
+			Count = 0;
 
 			return segment1;
 		}
@@ -153,7 +152,7 @@ namespace SocketServers
 		{
 			if (segment.IsInvalid())
 			{
-				Used = 0;
+				Count = 0;
 				segment = BufferManager.Allocate(MaxSize);
 			}
 		}

@@ -72,8 +72,11 @@ namespace SocketServers
 				var dataCount = e.Count;
 
 				if (e.OffsetOffset >= sizes.cbHeader)
-					e.ResizeBufferCount(e.Offset - sizes.cbHeader,
-						sizes.cbHeader + dataCount + sizes.cbTrailer);
+				{
+					e.OffsetOffset -= sizes.cbHeader;
+					e.Count = sizes.cbHeader + dataCount + sizes.cbTrailer;
+					e.ReAllocateBuffer(true);
+				}
 				else
 					throw new NotImplementedException("Ineffective way not implemented. Need to move buffer for SECBUFFER_STREAM_HEADER.");
 
@@ -92,8 +95,8 @@ namespace SocketServers
 					0,
 					null);
 
-				e.ResizeBufferCount(e.Offset, 
-					message.Buffers[0].Size + message.Buffers[1].Size + message.Buffers[2].Size);
+				e.Count = message.Buffers[0].Size + message.Buffers[1].Size + message.Buffers[2].Size;
+				e.ReAllocateBuffer(true);
 
 				base.SendAsync(e);
 			}
@@ -170,7 +173,7 @@ namespace SocketServers
 					SetSecBuffer(context, ref message.Buffers[0]);
 				else
 					SetSecBuffer(e, ref message.Buffers[0]);
-				
+
 
 				// call SSPI
 				//
@@ -194,8 +197,8 @@ namespace SocketServers
 									if (context.Buffer.CopyFrom(message.Buffers[extraIndex]) == false)
 										return false;
 
-								e.ResizeBufferTransfered(message.Buffers[dataIndex].Offset,
-									message.Buffers[dataIndex].Size);
+								e.Offset = message.Buffers[dataIndex].Offset;
+								e.BytesTransferred = message.Buffers[dataIndex].Size;
 
 								if (OnReceived(connection, ref e) == false)
 									return false;
@@ -215,8 +218,9 @@ namespace SocketServers
 
 								base.PrepareEventArgs(connection, e2);
 
-								e2.EmulateTransfer(buffer, message.Buffers[dataIndex].Offset,
-									message.Buffers[dataIndex].Size);
+								e2.ArraySegment = buffer;
+								e2.Offset = message.Buffers[dataIndex].Offset;
+								e2.BytesTransferred = message.Buffers[dataIndex].Size;
 
 								bool continue1 = OnReceived(connection, ref e2);
 
@@ -293,10 +297,10 @@ namespace SocketServers
 					//
 					if (oe == null)
 						oe = EventArgsManager.Get();
-					oe.SetBufferMax();
+					oe.AllocateBuffer();
 
 					output.Buffers[0].BufferType = BufferType.SECBUFFER_TOKEN;
-					output.Buffers[0].Size = oe.BufferCapacity;
+					output.Buffers[0].Size = oe.Count;
 					output.Buffers[0].Buffer = oe.Buffer;
 					output.Buffers[0].Offset = oe.Offset;
 					output.Buffers[1].BufferType = BufferType.SECBUFFER_EMPTY;
@@ -345,12 +349,13 @@ namespace SocketServers
 
 							if (oe.Count < maxTokenSize)
 							{
-								oe.SetBuffer(0, maxTokenSize);
+								oe.Count = maxTokenSize;
+								oe.ReAllocateBuffer(false);
 								continue;
 							}
 							return false;
 					}
-		
+
 
 					// send response to client
 					//
@@ -359,7 +364,7 @@ namespace SocketServers
 					{
 						if (output.Buffers[0].Size > 0)
 						{
-							oe.SetBuffer(0, output.Buffers[0].Size);
+							oe.Count = output.Buffers[0].Size;
 							oe.CopyAddressesFrom(ie);
 
 							base.SendAsync(oe);
@@ -386,7 +391,7 @@ namespace SocketServers
 						}
 						else
 						{
-							context.Buffer.MoveToBegin(context.Buffer.Count - input.Buffers[extraIndex].Size,
+							context.Buffer.MoveToBegin(context.Buffer.BytesTransferred - input.Buffers[extraIndex].Size,
 								input.Buffers[extraIndex].Size);
 						}
 					}
@@ -412,7 +417,7 @@ namespace SocketServers
 
 							if (extraIndex >= 0)
 								continue;
-							
+
 							return true;
 
 
@@ -439,7 +444,7 @@ namespace SocketServers
 		{
 			secBuffer.Buffer = context.Buffer.Array;
 			secBuffer.Offset = context.Buffer.Offset;
-			secBuffer.Size = context.Buffer.Count;
+			secBuffer.Size = context.Buffer.BytesTransferred;
 		}
 
 		private void GetMaxTokenSize()

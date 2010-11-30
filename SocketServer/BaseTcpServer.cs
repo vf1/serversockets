@@ -366,6 +366,8 @@ namespace SocketServers
 
 						if (e == null)
 							e = EventArgsManager.Get();
+						else
+							e.SetDefaultValue();
 
 						if (TcpReceiveAsync(connection, e))
 							e = null;
@@ -425,7 +427,8 @@ namespace SocketServers
 			e.ConnectionId = connection.Id;
 			e.RemoteEndPoint = connection.RemoteEndPoint;
 			e.Completed = Receive_Completed;
-			e.SetBufferMax(offsetOffset);
+			e.OffsetOffset = offsetOffset;
+			e.Count -= offsetOffset;
 		}
 
 		protected Connection<C> GetTcpConnection(IPEndPoint remote)
