@@ -111,6 +111,23 @@ namespace SocketServers
 			}
 		}
 
+		public bool Contain(Func<T, bool> predicate)
+		{
+			try
+			{
+				sync.EnterReadLock();
+				foreach (var pair in dictionary)
+					if (predicate(pair.Value))
+						return true;
+			}
+			finally
+			{
+				sync.ExitReadLock();
+			}
+
+			return false;
+		}
+
 		public void RemoveAll(Predicate<K> match, Action<T> removed)
 		{
 			try

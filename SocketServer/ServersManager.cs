@@ -190,6 +190,15 @@ namespace SocketServers
 			}
 		}
 
+		public bool IsLocalAddress(IPAddress address)
+		{
+			return servers.Contain((server) =>
+			{
+				return server.LocalEndPoint.Address.Equals(address) ||
+					(server.FakeEndPoint != null && server.FakeEndPoint.Address.Equals(address));
+			});
+		}
+
 		private void NetworkChange_NetworkAddressChanged(object sender, EventArgs e)
 		{
 			OnServerInfo(new ServerInfoEventArgs(ServerEndPoint.NoneEndPoint,
