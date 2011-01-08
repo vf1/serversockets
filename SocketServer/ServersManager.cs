@@ -101,7 +101,7 @@ namespace SocketServers
 			set;
 		}
 
-		public LockFreePool<ServerAsyncEventArgs> BuffersPool
+		public ILockFreePool<ServerAsyncEventArgs> BuffersPool
 		{
 			get { return EventArgsManager.Pool; }
 		}

@@ -10,36 +10,27 @@ using System.Threading;
 
 namespace SocketServers
 {
-	public interface ILockFreePoolItem
+	public interface ILockFreePoolItemIndex
 	{
-		bool IsPooled { set; }
-		void SetDefaultValue();
+		int Index { get; set; }
 	}
 
-	public interface ILockFreePool<T>
-	{
-		T Get();
-		void Put(ref T value);
-		void Put(T value);
-		int Queued { get; }
-		int Created { get; }
-	}
-
-	public class LockFreePool<T>
+	/// <summary>
+	/// This class is faster than LockFreePool on ~100% theory and ~30% in BufferPoolTest.
+	/// But LockFreeFastPool has one major disadvantage, it will not reuse array item slot if pool item lost.
+	/// </summary>
+	public class LockFreeFastPool<T>
 		: ILockFreePool<T>
-		where T : class, ILockFreePoolItem, IDisposable, new()
+		where T : class, ILockFreePoolItem, ILockFreePoolItemIndex, IDisposable, new()
 	{
 		private LockFreeItem<T>[] array;
-		private LockFreeStack<T> empty;
 		private LockFreeStack<T> full;
 		private Int32 created;
 
-		internal LockFreePool(int size)
+		internal LockFreeFastPool(int size)
 		{
 			array = new LockFreeItem<T>[size];
-
 			full = new LockFreeStack<T>(array, -1, -1);
-			empty = new LockFreeStack<T>(array, 0, array.Length);
 		}
 
 		public T Get()
@@ -51,15 +42,23 @@ namespace SocketServers
 			{
 				result = array[index].Value;
 				array[index].Value = default(T);
-
-				empty.Push(index);
 			}
 			else
 			{
 				result = new T();
 				result.SetDefaultValue();
+				result.Index = -1;
 
-				Interlocked.Increment(ref created);
+				if (created < array.Length)
+				{
+					int newIndex = Interlocked.Increment(ref created) - 1;
+					if (newIndex < array.Length)
+						result.Index = newIndex;
+#if DEBUG
+					else
+						throw new Exception(@"BufferPool too small");
+#endif
+				}
 			}
 
 			result.IsPooled = false;
@@ -76,7 +75,7 @@ namespace SocketServers
 		{
 			value.IsPooled = true;
 
-			int index = empty.Pop();
+			int index = value.Index;
 			if (index >= 0)
 			{
 				value.SetDefaultValue();
@@ -88,9 +87,6 @@ namespace SocketServers
 			else
 			{
 				value.Dispose();
-#if DEBUG
-				throw new Exception(@"BufferPool too small");
-#endif
 			}
 		}
 

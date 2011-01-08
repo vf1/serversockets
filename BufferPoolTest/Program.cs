@@ -4,23 +4,50 @@ using SocketServers;
 
 namespace BufferPoolTest
 {
+	enum TestObject
+	{
+		Pool,
+		FastPool,
+		StackQueue,
+	}
+
 	class Program
 	{
-		static bool testPool = false;
+		static TestObject testObject = TestObject.FastPool;
+		static bool testPool;
 		static LockFreeItem<Item>[] array;
 		static LockFreeQueue<Item> queue;
 		static LockFreeStack<Item> stack;
-		static LockFreePool<Item> pool;
+		static ILockFreePool<Item> pool;
 		static bool[] items;
 		static bool run;
 		static int count;
-		
+
 		const int threads = 4;
 		const int actions = 4;
 		const int poolSize = 16;
 
 		static void Main(string[] args)
 		{
+			Console.Write(@"Test Lock-free ");
+			if (testObject == TestObject.Pool)
+			{
+				Console.WriteLine("Pool");
+				testPool = true;
+			}
+			else if (testObject == TestObject.FastPool)
+			{
+				Console.WriteLine("Fast Pool");
+				testPool = true;
+			}
+			else if (testObject == TestObject.StackQueue)
+			{
+				Console.WriteLine("Stack & Queue (Not Pool)");
+				testPool = false;
+			}
+			else
+				throw new NotImplementedException();
+
 			Console.WriteLine(@"ThreadPool Test Starting...");
 
 			Console.WriteLine(@"  All threads: {0}", threads);
@@ -31,7 +58,10 @@ namespace BufferPoolTest
 
 			if (testPool)
 			{
-				pool = new LockFreePool<Item>(poolSize);
+				if (testObject == TestObject.Pool)
+					pool = new LockFreePool<Item>(poolSize);
+				if (testObject == TestObject.FastPool)
+					pool = new LockFreeFastPool<Item>(poolSize);
 			}
 			else
 			{
@@ -70,6 +100,7 @@ namespace BufferPoolTest
 
 			Item[] dequeued = new Item[actions];
 
+			int start = Environment.TickCount;
 			int actionPower = 24;
 			Int64 actionPowered = 1 << actionPower;
 			while (run)
@@ -89,14 +120,14 @@ namespace BufferPoolTest
 
 				for (int i = 0; i < dequeued.Length; i++)
 				{
-					if (items[dequeued[i].Index])
+					if (items[dequeued[i].TestIndex])
 						Console.WriteLine(@"Error");
 					else
-						items[dequeued[i].Index] = true;
+						items[dequeued[i].TestIndex] = true;
 				}
 
 				for (int i = 0; i < dequeued.Length; i++)
-					items[dequeued[i].Index] = false;
+					items[dequeued[i].TestIndex] = false;
 
 				for (int i = 0; i < dequeued.Length; i++)
 				{
@@ -116,7 +147,9 @@ namespace BufferPoolTest
 				{
 					if (actionPowered < actionCount)
 					{
-						Console.WriteLine("Reach 2 ^ {0}", actionPower);
+						int ms = Environment.TickCount - start;
+						double speed = (double)Thread.VolatileRead(ref actionCount) / (double)ms;
+						Console.WriteLine("Reach 2 ^ {0}: {1} ms, {2:0.00} per/ms", actionPower, ms, speed);
 						actionPower++;
 						actionPowered <<= 1;
 					}
@@ -133,15 +166,15 @@ namespace BufferPoolTest
 		}
 	}
 
-	class Item : ILockFreePoolItem, IDisposable
+	class Item : ILockFreePoolItem, ILockFreePoolItemIndex, IDisposable
 	{
 		public static int count = -1;
-		public int Index;
+		public int TestIndex;
 
 		public Item()
 		{
-			Index = Interlocked.Increment(ref count);
-			Console.WriteLine(@"Buffer created: #{0}", Index + 1);
+			TestIndex = Interlocked.Increment(ref count);
+			Console.WriteLine(@"Buffer created: #{0}", TestIndex + 1);
 		}
 
 		void ILockFreePoolItem.SetDefaultValue()
@@ -151,6 +184,12 @@ namespace BufferPoolTest
 		bool ILockFreePoolItem.IsPooled
 		{
 			set { }
+		}
+
+		int ILockFreePoolItemIndex.Index
+		{
+			get;
+			set;
 		}
 
 		void IDisposable.Dispose()

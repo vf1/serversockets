@@ -66,6 +66,7 @@
     <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArraySegmentHelpers.cs" />
     <Compile Include="EventArgsManager.cs" />
+    <Compile Include="LockFreeFastPool.cs" />
     <Compile Include="LockFreeItem.cs" />
     <Compile Include="LockFreeQueue.cs" />
     <Compile Include="SmartBufferPool.cs" />

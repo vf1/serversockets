@@ -8,7 +8,7 @@ namespace SocketServers
 {
 	class EventArgsManager
 	{
-		private static LockFreePool<ServerAsyncEventArgs> pool;
+		private static ILockFreePool<ServerAsyncEventArgs> pool;
 
 		public static void Initialize()
 		{
@@ -45,7 +45,7 @@ namespace SocketServers
 			pool.Put(value);
 		}
 
-		internal static LockFreePool<ServerAsyncEventArgs> Pool
+		internal static ILockFreePool<ServerAsyncEventArgs> Pool
 		{
 			get { return pool; }
 		}
