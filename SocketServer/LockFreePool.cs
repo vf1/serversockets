@@ -17,7 +17,9 @@ namespace SocketServers
 	}
 
 	public interface ILockFreePool<T>
+		: IDisposable
 	{
+		void Dispose();
 		T Get();
 		void Put(ref T value);
 		void Put(T value);
@@ -34,12 +36,26 @@ namespace SocketServers
 		private LockFreeStack<T> full;
 		private Int32 created;
 
-		internal LockFreePool(int size)
+		public LockFreePool(int size)
 		{
 			array = new LockFreeItem<T>[size];
 
 			full = new LockFreeStack<T>(array, -1, -1);
 			empty = new LockFreeStack<T>(array, 0, array.Length);
+		}
+
+		public void Dispose()
+		{
+			for (; ; )
+			{
+				int index = full.Pop();
+
+				if (index < 0)
+					break;
+
+				array[index].Value.Dispose();
+				array[index].Value = default(T);
+			}
 		}
 
 		public T Get()

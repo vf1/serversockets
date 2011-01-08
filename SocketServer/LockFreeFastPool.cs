@@ -27,10 +27,24 @@ namespace SocketServers
 		private LockFreeStack<T> full;
 		private Int32 created;
 
-		internal LockFreeFastPool(int size)
+		public LockFreeFastPool(int size)
 		{
 			array = new LockFreeItem<T>[size];
 			full = new LockFreeStack<T>(array, -1, -1);
+		}
+
+		public void Dispose()
+		{
+			for (; ; )
+			{
+				int index = full.Pop();
+
+				if (index < 0)
+					break;
+
+				array[index].Value.Dispose();
+				array[index].Value = default(T);
+			}
 		}
 
 		public T Get()
