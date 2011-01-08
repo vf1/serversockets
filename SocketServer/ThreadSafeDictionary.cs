@@ -8,18 +8,18 @@ using System.Threading;
 
 namespace SocketServers
 {
-	class SafeDictionary<K, T>
+	public class ThreadSafeDictionary<K, T>
 		where T : class
 	{
 		private ReaderWriterLockSlim sync;
 		private Dictionary<K, T> dictionary;
 
-		public SafeDictionary()
+		public ThreadSafeDictionary()
 			: this(-1)
 		{
 		}
 
-		public SafeDictionary(int capacity)
+		public ThreadSafeDictionary(int capacity)
 		{
 			sync = new ReaderWriterLockSlim();
 
@@ -48,6 +48,25 @@ namespace SocketServers
 			{
 				sync.EnterWriteLock();
 				dictionary.Add(key, value);
+			}
+			finally
+			{
+				sync.ExitWriteLock();
+			}
+		}
+
+		public bool TryAdd(K key, T value)
+		{
+			try
+			{
+				sync.EnterWriteLock();
+				
+				if (dictionary.ContainsKey(key))
+					return false;
+				
+				dictionary.Add(key, value);
+				
+				return true;
 			}
 			finally
 			{
@@ -128,7 +147,7 @@ namespace SocketServers
 			return false;
 		}
 
-		public void RemoveAll(Predicate<K> match, Action<T> removed)
+		public void Remove(Predicate<K> match, Action<T> removed)
 		{
 			try
 			{

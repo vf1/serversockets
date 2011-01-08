@@ -73,7 +73,7 @@
     <Compile Include="LockFreePool.cs" />
     <Compile Include="Global.cs" />
     <Compile Include="ProtocolPort.cs" />
-    <Compile Include="SafeDictionary.cs" />
+    <Compile Include="ThreadSafeDictionary.cs" />
     <Compile Include="LockFreeStack.cs" />
     <Compile Include="Secur32.cs" />
     <Compile Include="Server.Connection.cs" />

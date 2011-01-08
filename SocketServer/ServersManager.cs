@@ -18,8 +18,8 @@ namespace SocketServers
 	{
 		private object sync;
 		private bool running;
-		private SafeDictionary<ServerEndPoint, Server<C>> servers;
-		private SafeDictionary<ServerEndPoint, Server<C>> fakeServers;
+		private ThreadSafeDictionary<ServerEndPoint, Server<C>> servers;
+		private ThreadSafeDictionary<ServerEndPoint, Server<C>> fakeServers;
 		private List<ProtocolPort> protocolPorts;
 		private List<UnicastIPAddressInformation> networkAddressInfos;
 		private ServersManagerConfig config;
@@ -37,8 +37,8 @@ namespace SocketServers
 
 			this.sync = new object();
 			this.protocolPorts = new List<ProtocolPort>();
-			this.servers = new SafeDictionary<ServerEndPoint, Server<C>>();
-			this.fakeServers = new SafeDictionary<ServerEndPoint, Server<C>>();
+			this.servers = new ThreadSafeDictionary<ServerEndPoint, Server<C>>();
+			this.fakeServers = new ThreadSafeDictionary<ServerEndPoint, Server<C>>();
 
 			this.AddressPredicate = DefaultAddressPredicate;
 			this.FakeAddressAction = DefaultFakeAddressAction;
@@ -85,7 +85,7 @@ namespace SocketServers
 			lock (sync)
 			{
 				running = false;
-				servers.RemoveAll((endpoint) => { return true; }, OnServerRemoved);
+				servers.Remove((endpoint) => { return true; }, OnServerRemoved);
 			}
 		}
 
@@ -147,7 +147,7 @@ namespace SocketServers
 				protocolPorts.Remove(pp);
 
 				if (running)
-					servers.RemoveAll((endpoint) => { return endpoint.Port == pp.Port && endpoint.Protocol == pp.Protocol; }, OnServerRemoved);
+					servers.Remove((endpoint) => { return endpoint.Port == pp.Port && endpoint.Protocol == pp.Protocol; }, OnServerRemoved);
 			}
 		}
 
@@ -212,7 +212,7 @@ namespace SocketServers
 
 				AddServers(infos, true);
 
-				servers.RemoveAll(
+				servers.Remove(
 					(endpoint) =>
 					{
 						foreach (var info in infos)

@@ -51,7 +51,6 @@
     <Compile Include="LockFreePool.cs" />
     <Compile Include="Global.cs" />
     <Compile Include="ProtocolPort.cs" />
-    <Compile Include="SafeDictionary.cs" />
     <Compile Include="LockFreeStack.cs" />
     <Compile Include="Secur32.cs" />
     <Compile Include="Server.Connection.cs" />
@@ -70,6 +69,7 @@
     <Compile Include="StreamBuffer.cs" />
     <Compile Include="TcpServer.cs" />
     <Compile Include="SspiTlsServer.cs" />
+    <Compile Include="ThreadSafeDictionary.cs" />
     <Compile Include="UdpServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

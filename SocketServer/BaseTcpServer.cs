@@ -16,7 +16,7 @@ namespace SocketServers
 	{
 		private readonly object sync;
 		private Socket listener;
-		private SafeDictionary<EndPoint, Connection<C>> connections;
+		private ThreadSafeDictionary<EndPoint, Connection<C>> connections;
 		private readonly int receiveQueueSize;
 		private readonly int offsetOffset;
 		private bool socketReuseEnabled;
@@ -43,7 +43,7 @@ namespace SocketServers
 			{
 				isRunning = true;
 
-				connections = new SafeDictionary<EndPoint, Connection<C>>();
+				connections = new ThreadSafeDictionary<EndPoint, Connection<C>>();
 
 				listener = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				listener.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
