@@ -15,18 +15,23 @@ namespace SocketServers
 		private Dictionary<K, T> dictionary;
 
 		public ThreadSafeDictionary()
-			: this(-1)
+			: this(-1, null)
 		{
 		}
 
 		public ThreadSafeDictionary(int capacity)
+			: this(capacity, null)
+		{
+		}
+
+		public ThreadSafeDictionary(int capacity, IEqualityComparer<K> comparer)
 		{
 			sync = new ReaderWriterLockSlim();
 
 			if (capacity > 0)
-				dictionary = new Dictionary<K, T>(capacity);
+				dictionary = new Dictionary<K, T>(capacity, comparer);
 			else
-				dictionary = new Dictionary<K, T>();
+				dictionary = new Dictionary<K, T>(comparer);
 		}
 
 		public void Clear()
@@ -60,12 +65,12 @@ namespace SocketServers
 			try
 			{
 				sync.EnterWriteLock();
-				
+
 				if (dictionary.ContainsKey(key))
 					return false;
-				
+
 				dictionary.Add(key, value);
-				
+
 				return true;
 			}
 			finally

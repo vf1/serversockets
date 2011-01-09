@@ -19,7 +19,6 @@ namespace SocketServers
 	public interface ILockFreePool<T>
 		: IDisposable
 	{
-		void Dispose();
 		T Get();
 		void Put(ref T value);
 		void Put(T value);
