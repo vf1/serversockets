@@ -128,7 +128,7 @@ namespace SocketServers
 			Count = count;
 		}
 
-		internal ArraySegment<byte> Detach()
+		public ArraySegment<byte> Detach()
 		{
 			var segment1 = segment;
 

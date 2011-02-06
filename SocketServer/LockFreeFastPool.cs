@@ -79,6 +79,35 @@ namespace SocketServers
 			return result;
 		}
 
+		public T GetIfSpaceAvailable()
+		{
+			T result = default(T);
+
+			int index = full.Pop();
+			if (index >= 0)
+			{
+				result = array[index].Value;
+				array[index].Value = default(T);
+			}
+			else
+			{
+				if (created >= array.Length)
+					return default(T);
+
+				int newIndex = Interlocked.Increment(ref created) - 1;
+
+				if (newIndex >= array.Length)
+					return default(T);
+
+				result = new T();
+				result.SetDefaultValue();
+				result.Index = newIndex;
+			}
+
+			result.IsPooled = false;
+			return result;
+		}
+
 		public void Put(ref T value)
 		{
 			Put(value);

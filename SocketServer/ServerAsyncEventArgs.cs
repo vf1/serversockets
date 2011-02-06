@@ -66,6 +66,8 @@ namespace SocketServers
 
 			if (reRegisterForFinalize)
 				GC.ReRegisterForFinalize(this);
+
+			// Use GC.KeepAlive(this); instead gcFix.., not tested, but it is good idea.
 		}
 #endif
 
