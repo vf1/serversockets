@@ -216,7 +216,7 @@ namespace SocketServers
 					(endpoint) =>
 					{
 						foreach (var info in infos)
-							if (info.ServerEndPoint.IsEqual(endpoint))
+							if (info.ServerEndPoint.Equals(endpoint))
 								return false;
 						return true;
 					},

@@ -8,7 +8,7 @@ using System.Net;
 namespace SocketServers
 {
 	public class ServerEndPoint
-		: IPEndPoint
+		: IPEndPoint, IEquatable<ServerEndPoint>
 	{
 		public ServerEndPoint(ProtocolPort protocolPort, IPAddress address)
 			: base(address, protocolPort.Port)
@@ -36,7 +36,7 @@ namespace SocketServers
 			get { return new ProtocolPort(Protocol, Port); }
 		}
 
-		public bool IsEqual(ServerEndPoint p)
+		public bool Equals(ServerEndPoint p)
 		{
 			return AddressFamily == p.AddressFamily && Port == p.Port &&
 				Address.Equals(p.Address) && Protocol == p.Protocol;
@@ -52,7 +52,7 @@ namespace SocketServers
 			return new ServerEndPoint(Protocol, Address, Port);
 		}
 
-		public static ServerEndPoint NoneEndPoint = 
+		public static ServerEndPoint NoneEndPoint =
 			new ServerEndPoint(ServerIpProtocol.Tcp, IPAddress.None, 0);
 
 		public override int GetHashCode()
