@@ -51,9 +51,9 @@ namespace EchoServer
 						return fake;
 					return new IPEndPoint(address, port++);
 				};
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tcp, Port = serverPort, });
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Udp, Port = serverPort, });
-			serversManager.Bind(new ProtocolPort() { Protocol = ServerIpProtocol.Tls, Port = serverPort + 1, });
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerProtocol.Tcp, Port = serverPort, });
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerProtocol.Udp, Port = serverPort, });
+			serversManager.Bind(new ProtocolPort() { Protocol = ServerProtocol.Tls, Port = serverPort + 1, });
 			serversManager.ServerAdded += ServersManager_ServerAdded;
 			serversManager.ServerRemoved += ServersManager_ServerRemoved;
 			serversManager.ServerInfo += ServersManager_ServerInfo;

@@ -17,29 +17,43 @@ namespace SocketServers
 		}
 
 
-		public ServerEndPoint(ServerIpProtocol protocol, IPAddress address, int port)
+		public ServerEndPoint(ServerProtocol protocol, IPAddress address, int port)
 			: base(address, port)
 		{
 			Protocol = protocol;
 		}
 
-		public ServerEndPoint(ServerIpProtocol protocol, IPEndPoint endpoint)
+		public ServerEndPoint(ServerProtocol protocol, IPEndPoint endpoint)
 			: base(endpoint.Address, endpoint.Port)
 		{
 			Protocol = protocol;
 		}
 
-		public ServerIpProtocol Protocol { get; set; }
+		public ServerProtocol Protocol { get; set; }
 
 		public ProtocolPort ProtocolPort
 		{
 			get { return new ProtocolPort(Protocol, Port); }
 		}
 
+		public new bool Equals(object x)
+		{
+			if (x is ServerEndPoint)
+				return Equals(x as ServerEndPoint);
+
+			return false;
+		}
+
 		public bool Equals(ServerEndPoint p)
 		{
 			return AddressFamily == p.AddressFamily && Port == p.Port &&
 				Address.Equals(p.Address) && Protocol == p.Protocol;
+		}
+
+		public bool Equals(ServerProtocol protocol, IPEndPoint endpoint)
+		{
+			return AddressFamily == endpoint.AddressFamily && Port == endpoint.Port &&
+				Address.Equals(endpoint.Address) && Protocol == protocol;
 		}
 
 		public new string ToString()
@@ -53,7 +67,7 @@ namespace SocketServers
 		}
 
 		public static ServerEndPoint NoneEndPoint =
-			new ServerEndPoint(ServerIpProtocol.Tcp, IPAddress.None, 0);
+			new ServerEndPoint(ServerProtocol.Tcp, IPAddress.None, 0);
 
 		public override int GetHashCode()
 		{

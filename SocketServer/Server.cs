@@ -93,11 +93,11 @@ namespace SocketServers
 		{
 			Server<C> server = null;
 
-			if (real.Protocol == ServerIpProtocol.Tcp)
+			if (real.Protocol == ServerProtocol.Tcp)
 				server = new TcpServer<C>(config);
-			else if (real.Protocol == ServerIpProtocol.Udp)
+			else if (real.Protocol == ServerProtocol.Udp)
 				server = new UdpServer<C>(config);
-			else if (real.Protocol == ServerIpProtocol.Tls)
+			else if (real.Protocol == ServerProtocol.Tls)
 				server = new SspiTlsServer<C>(config);
 			else
 				throw new InvalidOperationException(@"Protocol is not supported.");

@@ -10,13 +10,13 @@ namespace SocketServers
 {
 	public struct ProtocolPort
 	{
-		public ProtocolPort(ServerIpProtocol protocol, int port)
+		public ProtocolPort(ServerProtocol protocol, int port)
 		{
 			Protocol = protocol;
 			Port = port;
 		}
 
 		public int Port;
-		public ServerIpProtocol Protocol;
+		public ServerProtocol Protocol;
 	}
 }
