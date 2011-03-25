@@ -135,7 +135,7 @@ namespace SocketServers
 			// proccess all data from buffer if TLS connected status was changed
 			//
 			while (result && oldConnected != connection.SspiContext.Connected &&
-				connection.SspiContext.Buffer.IsValid())
+				connection.SspiContext.Buffer.IsValid)
 			{
 				oldConnected = connection.SspiContext.Connected;
 
@@ -154,7 +154,7 @@ namespace SocketServers
 			var context = connection.SspiContext;
 			var message = context.SecBufferDesc5;
 
-			if (context.Buffer.IsValid() && e != null)
+			if (context.Buffer.IsValid && e != null)
 				if (context.Buffer.CopyTransferredFrom(e, 0) == false)
 					return false;
 
@@ -169,7 +169,7 @@ namespace SocketServers
 				message.Buffers[3].BufferType = BufferType.SECBUFFER_EMPTY;
 				message.Buffers[4].BufferType = BufferType.SECBUFFER_EMPTY;
 
-				if (context.Buffer.IsValid())
+				if (context.Buffer.IsValid)
 					SetSecBuffer(context, ref message.Buffers[0]);
 				else
 					SetSecBuffer(e, ref message.Buffers[0]);
@@ -191,7 +191,7 @@ namespace SocketServers
 
 						if (dataIndex >= 0)
 						{
-							if (context.Buffer.IsInvalid())
+							if (context.Buffer.IsInvalid)
 							{
 								if (extraIndex >= 0)
 									if (context.Buffer.CopyFrom(message.Buffers[extraIndex]) == false)
@@ -242,7 +242,7 @@ namespace SocketServers
 
 					case SecurityStatus.SEC_E_INCOMPLETE_MESSAGE:
 
-						if (context.Buffer.IsInvalid())
+						if (context.Buffer.IsInvalid)
 							if (context.Buffer.CopyTransferredFrom(e, 0) == false)
 								return false;
 
@@ -276,7 +276,7 @@ namespace SocketServers
 
 			try
 			{
-				if (context.Buffer.IsValid() && ie != null)
+				if (context.Buffer.IsValid && ie != null)
 					if (context.Buffer.CopyTransferredFrom(ie, 0) == false)
 						return false;
 
@@ -287,7 +287,7 @@ namespace SocketServers
 					input.Buffers[0].BufferType = BufferType.SECBUFFER_TOKEN;
 					input.Buffers[1].BufferType = BufferType.SECBUFFER_EMPTY;
 
-					if (context.Buffer.IsValid())
+					if (context.Buffer.IsValid)
 						SetSecBuffer(context, ref input.Buffers[0]);
 					else
 						SetSecBuffer(ie, ref input.Buffers[0]);
@@ -339,7 +339,7 @@ namespace SocketServers
 					{
 						case SecurityStatus.SEC_E_INCOMPLETE_MESSAGE:
 
-							if (context.Buffer.IsInvalid())
+							if (context.Buffer.IsInvalid)
 								if (context.Buffer.CopyTransferredFrom(ie, 0) == false)
 									return false;
 							return true;
@@ -383,7 +383,7 @@ namespace SocketServers
 					}
 					else
 					{
-						if (context.Buffer.IsInvalid())
+						if (context.Buffer.IsInvalid)
 						{
 							if (context.Buffer.CopyTransferredFrom(ie,
 							   ie.BytesTransferred - input.Buffers[extraIndex].Size) == false)

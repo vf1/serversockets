@@ -28,25 +28,34 @@ namespace SocketServers
 			private set;
 		}
 
-		public bool Resize(int maxSize)
+		public void MoveCount(int offset)
 		{
-			if (maxSize > BufferManager.MaxSize)
+			Count += offset;
+		}
+
+		public bool Resize(int capacity)
+		{
+			if (capacity > BufferManager.MaxSize)
 				return false;
 
-			if (maxSize < Count)
+			if (capacity < Count)
 				return false;
 
-			MaxSize = maxSize;
-
-			if (maxSize > segment.Count)
+			if (Capacity != capacity)
 			{
-				var old = segment;
-				segment = BufferManager.Allocate(maxSize);
+				Capacity = capacity;
 
-				if (old.IsValid())
+				if (capacity > segment.Count)
 				{
-					Buffer.BlockCopy(old.Array, old.Offset, segment.Array, segment.Offset, Count);
-					BufferManager.Free(ref old);
+					var old = segment;
+					segment = BufferManager.Allocate(capacity);
+
+					if (old.IsValid())
+					{
+						if (Count > 0)
+							Buffer.BlockCopy(old.Array, old.Offset, segment.Array, segment.Offset, Count);
+						BufferManager.Free(ref old);
+					}
 				}
 			}
 
@@ -59,15 +68,25 @@ namespace SocketServers
 			BufferManager.Free(ref segment);
 		}
 
+		public void Clear()
+		{
+			Count = 0;
+		}
+
 		public void Dispose()
 		{
 			Free();
 		}
 
-		public int MaxSize
+		public int Capacity
 		{
 			get;
 			private set;
+		}
+
+		public int FreeSize
+		{
+			get { return Capacity - Count; }
 		}
 
 		public int BytesTransferred
@@ -84,13 +103,13 @@ namespace SocketServers
 			return CopyFrom(e.Buffer, e.Offset + skipBytes, e.BytesTransferred - skipBytes);
 		}
 
-		public bool CopyFrom(ArraySegment<byte> segmnet, int skipBytes)
+		public bool CopyFrom(ArraySegment<byte> segment1, int skipBytes)
 		{
 #if DEBUG
 			if (segmnet.Count < skipBytes)
 				throw new ArgumentOutOfRangeException();
 #endif
-			return CopyFrom(segmnet.Array, segmnet.Offset + skipBytes, segmnet.Count - skipBytes);
+			return CopyFrom(segment1.Array, segment1.Offset + skipBytes, segment1.Count - skipBytes);
 		}
 
 		public bool CopyFrom(ArraySegment<byte> segmnet)
@@ -105,7 +124,7 @@ namespace SocketServers
 
 		public bool CopyFrom(byte[] array, int offset, int count)
 		{
-			if (count > MaxSize - Count)
+			if (count > Capacity - Count)
 				return false;
 
 			if (count == 0)
@@ -120,9 +139,14 @@ namespace SocketServers
 			return true;
 		}
 
+		public void MoveToBegin(int offsetOffset)
+		{
+			MoveToBegin(offsetOffset, Count - offsetOffset);
+		}
+
 		public void MoveToBegin(int offsetOffset, int count)
 		{
-			Buffer.BlockCopy(segment.Array, segment.Offset + offsetOffset, 
+			Buffer.BlockCopy(segment.Array, segment.Offset + offsetOffset,
 				segment.Array, segment.Offset, count);
 
 			Count = count;
@@ -138,14 +162,20 @@ namespace SocketServers
 			return segment1;
 		}
 
-		public bool IsValid()
+		public bool IsValid
 		{
-			return segment.Array != null && segment.Offset >= 0 && segment.Count > 0;
+			get
+			{
+				return segment.Array != null && segment.Offset >= 0 && segment.Count > 0;
+			}
 		}
 
-		public bool IsInvalid()
+		public bool IsInvalid
 		{
-			return segment.Array == null || segment.Offset < 0 || segment.Count <= 0;
+			get
+			{
+				return segment.Array == null || segment.Offset < 0 || segment.Count <= 0;
+			}
 		}
 
 		private void Create()
@@ -153,7 +183,7 @@ namespace SocketServers
 			if (segment.IsInvalid())
 			{
 				Count = 0;
-				segment = BufferManager.Allocate(MaxSize);
+				segment = BufferManager.Allocate(Capacity);
 			}
 		}
 	}

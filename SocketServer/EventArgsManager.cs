@@ -6,22 +6,22 @@ using System;
 
 namespace SocketServers
 {
-	class EventArgsManager
+	public class EventArgsManager
 	{
 		private static ILockFreePool<ServerAsyncEventArgs> pool;
 
-		public static void Initialize()
+		internal static void Initialize()
 		{
 			pool = new LockFreePool<ServerAsyncEventArgs>(
 				(int)(BufferManager.MaxMemoryUsage / ServerAsyncEventArgs.DefaultSize));
 		}
 
-		public static void Initialize(int size)
+		internal static void Initialize(int size)
 		{
 			pool = new LockFreePool<ServerAsyncEventArgs>(size);
 		}
 
-		public static bool IsInitialized()
+		internal static bool IsInitialized()
 		{
 			return pool != null;
 		}

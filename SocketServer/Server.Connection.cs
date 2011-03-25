@@ -34,9 +34,10 @@ namespace SocketServers
 
 			internal bool Close()
 			{
-				SpinLock.Enter();
+				// ?!
+				//SpinLock.Enter();
 				bool result = Interlocked.Increment(ref closeCount) == 1;
-				SpinLock.Exit();
+				//SpinLock.Exit();
 
 				if (result)
 				{
@@ -44,9 +45,6 @@ namespace SocketServers
 
 					if (sspiContext != null)
 						sspiContext.Dispose();
-
-					if (UserConnection != null)
-						UserConnection.Dispose();
 
 					if (UserConnection != null)
 						UserConnection.Dispose();

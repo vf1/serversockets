@@ -17,7 +17,7 @@ namespace SocketServers
 	{
 		public const int AnyNewConnectionId = -1;
 		public const int AnyConnectionId = -2;
-		public const int DefaultSize = 4096;
+		public const int DefaultSize = 2048;
 
 		private bool isPooled;
 
@@ -105,6 +105,8 @@ namespace SocketServers
 			count = DefaultSize;
 			offsetOffset = 0;
 			bytesTransfered = 0;
+
+			UserTokenForSending = 0;
 		}
 
 		#endregion
@@ -180,6 +182,12 @@ namespace SocketServers
 
 		internal int SequenceNumber;
 
+		public int UserTokenForSending
+		{
+			get;
+			set;
+		}
+
 		public void CopyAddressesFrom(ServerAsyncEventArgs e)
 		{
 			ConnectionId = e.ConnectionId;
@@ -192,6 +200,24 @@ namespace SocketServers
 			ConnectionId = c.Id;
 			LocalEndPoint = c.LocalEndPoint;
 			RemoteEndPoint = c.RemoteEndPoint;
+		}
+
+		public ServerAsyncEventArgs DeepCopy()
+		{
+			var e2 = EventArgsManager.Get();
+
+			e2.CopyAddressesFrom(this);
+
+			e2.Count = Count;
+			e2.AllocateBuffer();
+
+			e2.OffsetOffset = OffsetOffset;
+			e2.BytesTransferred = BytesTransferred;
+			e2.UserTokenForSending = UserTokenForSending;
+
+			System.Buffer.BlockCopy(Buffer, Offset, e2.Buffer, e2.Offset, e2.Count);
+
+			return e2;
 		}
 
 		#region SocketAsyncEventArgs
@@ -208,8 +234,8 @@ namespace SocketServers
 			{
 				serverArgs.socketArgs.SetBuffer(null, -1, -1);
 			}
-			
-			
+
+
 			return serverArgs.socketArgs;
 		}
 
@@ -334,14 +360,14 @@ namespace SocketServers
 
 		public byte[] Buffer
 		{
-			get 
-			{ 
+			get
+			{
 				Trace();
 
-				if (segment.Array == null)
+				if (offsetOffset + count > segment.Count)
 					ReAllocateBuffer(false);
 
-				return segment.Array; 
+				return segment.Array;
 			}
 		}
 
