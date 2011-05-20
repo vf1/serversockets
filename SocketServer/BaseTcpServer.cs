@@ -173,20 +173,14 @@ namespace SocketServers
 				}
 			}
 
-			// send message or report connection error
-			//
 			if (e.SocketError == SocketError.Success)
 			{
-				connection.Socket.SendAsync(e, Send_Completed);
-
 				if (newConnection)
 					NewTcpConnection(connection);
 			}
-			else
-			{
-				e.Completed = Send_Completed;
-				e.OnCompleted(socket1);
-			}
+
+			e.Completed = Send_Completed;
+			e.OnCompleted(socket1);
 		}
 
 		private Connection<C> CreateConnection(Socket socket, SocketError error)
