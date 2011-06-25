@@ -309,6 +309,9 @@ namespace SocketServers
 				}
 			}
 
+			if (ignoreErrors == false && created.Count == 0)
+				error = SocketError.SystemNotReady;
+
 			if (error != SocketError.Success)
 			{
 				foreach (var server in created)

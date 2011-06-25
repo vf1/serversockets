@@ -106,7 +106,7 @@ namespace SocketServers
 		public bool CopyFrom(ArraySegment<byte> segment1, int skipBytes)
 		{
 #if DEBUG
-			if (segmnet.Count < skipBytes)
+			if (segment.Count < skipBytes)
 				throw new ArgumentOutOfRangeException();
 #endif
 			return CopyFrom(segment1.Array, segment1.Offset + skipBytes, segment1.Count - skipBytes);

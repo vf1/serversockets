@@ -23,7 +23,7 @@ namespace SocketServers
 
 		private int count;
 		private int offsetOffset;
-		private int bytesTransfered;
+		private int bytesTransferred;
 		private ArraySegment<byte> segment;
 		private SocketAsyncEventArgs socketArgs;
 
@@ -104,7 +104,7 @@ namespace SocketServers
 
 			count = DefaultSize;
 			offsetOffset = 0;
-			bytesTransfered = 0;
+			bytesTransferred = 0;
 
 			UserTokenForSending = 0;
 		}
@@ -208,11 +208,11 @@ namespace SocketServers
 
 			e2.CopyAddressesFrom(this);
 
-			e2.Count = Count;
+			e2.offsetOffset = offsetOffset;
+			e2.count = count;
 			e2.AllocateBuffer();
 
-			e2.OffsetOffset = OffsetOffset;
-			e2.BytesTransferred = BytesTransferred;
+			e2.bytesTransferred = bytesTransferred;
 			e2.UserTokenForSending = UserTokenForSending;
 
 			System.Buffer.BlockCopy(Buffer, Offset, e2.Buffer, e2.Offset, e2.Count);
@@ -329,6 +329,8 @@ namespace SocketServers
 #if DEBUG
 				if (value < 0)
 					throw new ArgumentOutOfRangeException(@"Count can not be negative number");
+				if (value < offsetOffset)
+					throw new ArgumentOutOfRangeException(@"Count can not be less than OffsetOffset");
 #endif
 				count = value;
 			}
@@ -336,7 +338,7 @@ namespace SocketServers
 
 		public int BytesTransferred
 		{
-			get { Trace(); return bytesTransfered; }
+			get { Trace(); return bytesTransferred; }
 			set
 			{
 				Trace();
@@ -344,7 +346,7 @@ namespace SocketServers
 				if (value < 0)
 					throw new ArgumentOutOfRangeException(@"BytesTransferred can not be negative number");
 #endif
-				bytesTransfered = value;
+				bytesTransferred = value;
 			}
 		}
 
@@ -430,6 +432,18 @@ namespace SocketServers
 			Count = segment.Count;
 		}
 
+		public ArraySegment<byte> DetachBuffer()
+		{
+			var result = segment;
+			segment = new ArraySegment<byte>();
+
+			count = DefaultSize;
+			offsetOffset = 0;
+			bytesTransferred = 0;
+
+			return result;
+		}
+
 		#endregion
 
 		#region Completed
@@ -446,7 +460,7 @@ namespace SocketServers
 		{
 			var serverArgs = e.UserToken as ServerAsyncEventArgs;
 
-			serverArgs.bytesTransfered = e.BytesTransferred;
+			serverArgs.bytesTransferred = e.BytesTransferred;
 
 			serverArgs.Completed(sender as Socket, serverArgs);
 		}
