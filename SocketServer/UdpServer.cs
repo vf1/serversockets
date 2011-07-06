@@ -68,13 +68,19 @@ namespace SocketServers
 		{
 			int count = (int)stateInfo;
 
-			for (int i = 0; i < count; i++)
+			lock (sync)
 			{
-				var e = EventArgsManager.Get();
+				if (socket != null)
+				{
+					for (int i = 0; i < count && isRunning; i++)
+					{
+						var e = EventArgsManager.Get();
 
-				PrepareBuffer(e);
-				if (socket.ReceiveFromAsync(e) == false)
-					e.OnCompleted(socket);
+						PrepareBuffer(e);
+						if (socket.ReceiveFromAsync(e) == false)
+							e.OnCompleted(socket);
+					}
+				}
 			}
 		}
 
