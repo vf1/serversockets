@@ -465,7 +465,7 @@ namespace Microsoft.Win32.Ssp
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
-	struct SecPkgContext_StreamSizes
+	public struct SecPkgContext_StreamSizes
 	{
 		public int cbHeader;
 		public int cbTrailer;
@@ -557,7 +557,9 @@ namespace Microsoft.Win32.Ssp
 
 	#endregion
 
-	class SspiException
+	#region class SspiException {...}
+
+	public class SspiException
 		: Win32Exception
 	{
 		public SspiException(int error, string function)
@@ -571,7 +573,11 @@ namespace Microsoft.Win32.Ssp
 		}
 	}
 
-	static class Sspi
+	#endregion
+
+	#region class Sspi {...}
+
+	public static class Sspi
 	{
 		public static bool Succeeded(SecurityStatus result)
 		{
@@ -629,10 +635,10 @@ namespace Microsoft.Win32.Ssp
 					out handle,
 					out expiry);
 
-				credential = new SafeCredHandle(handle);
-
 				if (error != 0)
 					throw new SspiException(error, @"AcquireCredentialsHandleA");
+
+				credential = new SafeCredHandle(handle);
 			}
 			finally
 			{
@@ -641,6 +647,31 @@ namespace Microsoft.Win32.Ssp
 
 				if (paCred != null)
 					authData.paCreds1 = paCred[0];
+			}
+		}
+
+		public static unsafe SafeCredHandle SafeAcquireCredentialsHandle(string package, CredentialUse credentialUse)
+		{
+			long expiry;
+			CredHandle handle;
+
+			try
+			{
+				int error = Secur32Dll.AcquireCredentialsHandleA(
+					null,
+					package,
+					(int)credentialUse,
+					null,
+					null,
+					null,
+					null,
+					out handle,
+					out expiry);
+
+				return new SafeCredHandle(handle);
+			}
+			finally
+			{
 			}
 		}
 
@@ -774,6 +805,31 @@ namespace Microsoft.Win32.Ssp
 
 		public unsafe static SecurityStatus SafeQueryContextAttributes(
 			ref SafeCtxtHandle context,
+			out SecPkgContext_Sizes packageSizes)
+		{
+			fixed (void* buffer = &packageSizes)
+				return SafeQueryContextAttributes(ref context, UlAttribute.SECPKG_ATTR_SIZES, buffer);
+		}
+
+		public unsafe static SecurityStatus SafeQueryContextAttributes(
+			ref SafeCtxtHandle context,
+			out string name)
+		{
+			var names = new SecPkgContext_Names[1];
+
+			fixed (void* buffer = names)
+			{
+				var result = SafeQueryContextAttributes(ref context, UlAttribute.SECPKG_ATTR_NAMES, buffer);
+
+				name = Marshal.PtrToStringAnsi(names[0].sUserName);
+				Secur32Dll.FreeContextBuffer(names[0].sUserName);
+
+				return result;
+			}
+		}
+
+		public unsafe static SecurityStatus SafeQueryContextAttributes(
+			ref SafeCtxtHandle context,
 			UlAttribute attribute,
 			void* buffer)
 		{
@@ -792,6 +848,33 @@ namespace Microsoft.Win32.Ssp
 			}
 		}
 
+		public unsafe static SecurityStatus SafeMakeSignature(
+			SafeCtxtHandle context,
+			ref SecBufferDescEx message,
+			int sequence)
+		{
+			try
+			{
+				message.Pin();
+
+				var error = Secur32Dll.MakeSignature(
+					ref context.Handle,
+					0,
+					ref message.SecBufferDesc,
+					sequence);
+
+				return Convert(error);
+			}
+			catch
+			{
+				return SecurityStatus.SEC_E_UNKNOW_ERROR;
+			}
+			finally
+			{
+				message.Free();
+			}
+		}
+
 		public static SecurityStatus Convert(int error)
 		{
 			if (Enum.IsDefined(typeof(SecurityStatus), (uint)error))
@@ -799,6 +882,10 @@ namespace Microsoft.Win32.Ssp
 			return SecurityStatus.SEC_E_UNKNOW_ERROR;
 		}
 	}
+
+	#endregion
+
+	#region class Secur32Dll {...}
 
 	[SuppressUnmanagedCodeSecurity]
 	static class Secur32Dll
@@ -861,7 +948,7 @@ namespace Microsoft.Win32.Ssp
 		[DllImport(SECUR32, ExactSpelling = true, SetLastError = true)]
 		[ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
 		public static extern int MakeSignature(
-			[In] ref SecHandle phContext,
+			[In] ref CtxtHandle phContext,
 			[In] int fQOP,
 			[In, Out] ref SecBufferDesc pMessage,
 			[In] int MessageSeqNo);
@@ -869,7 +956,7 @@ namespace Microsoft.Win32.Ssp
 		[DllImport(SECUR32, ExactSpelling = true, SetLastError = true)]
 		[ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
 		public static extern int VerifySignature(
-			[In] ref SecHandle phContext,
+			[In] ref CtxtHandle phContext,
 			[In] ref SecBufferDesc pMessage,
 			[In] int MessageSeqNo,
 			[Out] out int pfQOP);
@@ -898,4 +985,6 @@ namespace Microsoft.Win32.Ssp
 			[In, Out] ref SecBufferDesc pMessage,
 			[In] uint MessageSeqNo);
 	}
+
+	#endregion
 }
