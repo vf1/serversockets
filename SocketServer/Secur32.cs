@@ -875,6 +875,35 @@ namespace Microsoft.Win32.Ssp
 			}
 		}
 
+		public unsafe static SecurityStatus SafeVerifySignature(
+			SafeCtxtHandle context,
+			ref SecBufferDescEx message,
+			int sequence)
+		{
+			try
+			{
+				message.Pin();
+
+				int qop;
+
+				var error = Secur32Dll.VerifySignature(
+					ref context.Handle,
+					ref message.SecBufferDesc,
+					sequence,
+					out qop);
+
+				return Convert(error);
+			}
+			catch
+			{
+				return SecurityStatus.SEC_E_UNKNOW_ERROR;
+			}
+			finally
+			{
+				message.Free();
+			}
+		}
+
 		public static SecurityStatus Convert(int error)
 		{
 			if (Enum.IsDefined(typeof(SecurityStatus), (uint)error))
