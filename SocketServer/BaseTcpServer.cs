@@ -146,9 +146,8 @@ namespace SocketServers
 
 			if (e.SocketError == SocketError.Success)
 			{
-				connection = new Connection<C>(socket1, false, receiveQueueSize);
-				connections.Add(e.RemoteEndPoint, connection);
-				newConnection = true;
+				connection = CreateConnection(socket1, e.SocketError);
+				newConnection = connection != null;
 			}
 			else
 			{
@@ -165,9 +164,8 @@ namespace SocketServers
 					{
 						if (e.SocketError == SocketError.Success)
 						{
-							connection = new Connection<C>(socket1, false, receiveQueueSize);
-							connections.Add(e.RemoteEndPoint, connection);
-							newConnection = true;
+							connection = CreateConnection(socket1, e.SocketError);
+							newConnection = connection != null;
 						}
 					}
 				}
