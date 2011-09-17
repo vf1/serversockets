@@ -89,7 +89,26 @@ namespace SocketServers
 			while (isRunning)
 			{
 				if (e.SocketError == SocketError.Success)
+				{
 					OnReceived(null, ref e);
+
+					if (e == null)
+						e = EventArgsManager.Get();
+
+					PrepareBuffer(e);
+
+					try
+					{
+						if (socket.ReceiveFromAsync(e))
+						{
+							e = null;
+							break;
+						}
+					}
+					catch (ObjectDisposedException)
+					{
+					}
+				}
 				else
 				{
 					if (isRunning)
@@ -98,16 +117,9 @@ namespace SocketServers
 						OnFailed(new ServerInfoEventArgs(realEndPoint, e.SocketError));
 					}
 				}
-
-				if (e == null)
-					e = EventArgsManager.Get();
-
-				PrepareBuffer(e);
-				if (socket.ReceiveFromAsync(e))
-					break;
 			}
 
-			if (isRunning == false)
+			if (e != null)
 				EventArgsManager.Put(e);
 		}
 
