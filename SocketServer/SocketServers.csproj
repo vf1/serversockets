@@ -69,6 +69,8 @@
     <Compile Include="LockFreeFastPool.cs" />
     <Compile Include="LockFreeItem.cs" />
     <Compile Include="LockFreeQueue.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="PcapWriter.cs" />
     <Compile Include="SmartBufferPool.cs" />
     <Compile Include="LockFreePool.cs" />
     <Compile Include="Global.cs" />

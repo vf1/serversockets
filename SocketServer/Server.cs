@@ -45,25 +45,19 @@ namespace SocketServers
 
 		protected void Send_Completed(Socket socket, ServerAsyncEventArgs e)
 		{
-			if (Sent != null)
-				Sent(this, e);
+			Sent(this, e);
 		}
 
 		protected virtual bool OnReceived(Connection<C> c, ref ServerAsyncEventArgs e)
 		{
-			if (Received != null)
-			{
-				e.LocalEndPoint = GetLocalEndpoint(e.RemoteEndPoint.Address);
-				return Received(this, c != null ? c.UserConnection : null, ref e);
-			}
+			e.LocalEndPoint = GetLocalEndpoint(e.RemoteEndPoint.Address);
 
-			return false;
+			return Received(this, c != null ? c.UserConnection : null, ref e);
 		}
 
 		protected virtual void OnFailed(ServerInfoEventArgs e)
 		{
-			if (Failed != null)
-				Failed(this, e);
+			Failed(this, e);
 		}
 
 		protected virtual void OnNewConnection(Connection<C> connection)

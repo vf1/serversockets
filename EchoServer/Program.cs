@@ -62,6 +62,8 @@ namespace EchoServer
 			serversManager.NewConnection += ServersManager_NewConnection;
 			serversManager.EndConnection += ServersManager_EndConnection;
 
+			//serversManager.Logger.Enable("test-log.pcap");
+
 			//for (int i = 0; i < 10; i++)
 			//	serversManager.BuffersPool.Get();
 

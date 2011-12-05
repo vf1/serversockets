@@ -24,11 +24,12 @@ namespace SocketServers
 		private List<UnicastIPAddressInformation> networkAddressInfos;
 		private ServersManagerConfig config;
 		private int nextPort;
+		private Logger logger;
 
 		public ServersManager(ServersManagerConfig config)
 		{
 			if (BufferManager.IsInitialized() == false)
-				BufferManager.Initialize(2048); // Mb
+				BufferManager.Initialize(256); // Mb
 
 			if (EventArgsManager.IsInitialized() == false)
 				EventArgsManager.Initialize();
@@ -46,6 +47,8 @@ namespace SocketServers
 			this.config = config;
 
 			this.nextPort = config.MinPort;
+
+			this.logger = new Logger();
 		}
 
 		public event EventHandler<ServerChangeEventArgs> ServerRemoved;
@@ -86,6 +89,8 @@ namespace SocketServers
 			{
 				running = false;
 				servers.Remove((endpoint) => { return true; }, OnServerRemoved);
+
+				logger.Dispose();
 			}
 		}
 
@@ -151,21 +156,24 @@ namespace SocketServers
 			}
 		}
 
-		public void SendAsync(ServerAsyncEventArgs eventArgs)
+		public void SendAsync(ServerAsyncEventArgs e)
 		{
-			var server = servers.GetValue(eventArgs.LocalEndPoint);
+			var server = servers.GetValue(e.LocalEndPoint);
 
 			if (server == null)
-				server = fakeServers.GetValue(eventArgs.LocalEndPoint);
+				server = fakeServers.GetValue(e.LocalEndPoint);
 
 			if (server != null)
 			{
-				server.SendAsync(eventArgs);
+				if (logger.IsEnabled)
+					logger.Write(e, false);
+
+				server.SendAsync(e);
 			}
 			else
 			{
-				eventArgs.SocketError = SocketError.NetworkDown;
-				Server_Sent(null, eventArgs);
+				e.SocketError = SocketError.NetworkDown;
+				Server_Sent(null, e);
 			}
 		}
 
@@ -197,6 +205,11 @@ namespace SocketServers
 				return server.LocalEndPoint.Address.Equals(address) ||
 					(server.FakeEndPoint != null && server.FakeEndPoint.Address.Equals(address));
 			});
+		}
+
+		public Logger Logger
+		{
+			get { return logger; }
 		}
 
 		private void NetworkChange_NetworkAddressChanged(object sender, EventArgs e)
@@ -333,6 +346,9 @@ namespace SocketServers
 		{
 			try
 			{
+				if (logger.IsEnabled)
+					logger.Write(e, true);
+
 				if (Received != null)
 					return Received(this, c, ref e);
 				return false;

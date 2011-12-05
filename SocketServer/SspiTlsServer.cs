@@ -58,8 +58,6 @@ namespace SocketServers
 			try
 			{
 				var connection = GetTcpConnection(e.RemoteEndPoint);
-				var context = connection.SspiContext;
-				var sizes = context.StreamSizes;
 
 				if (connection == null)
 				{
@@ -68,6 +66,9 @@ namespace SocketServers
 					e.OnCompleted(null);
 					return;
 				}
+
+				var context = connection.SspiContext;
+				var sizes = context.StreamSizes;
 
 				var dataCount = e.Count;
 
@@ -199,6 +200,7 @@ namespace SocketServers
 
 								e.Offset = message.Buffers[dataIndex].Offset;
 								e.BytesTransferred = message.Buffers[dataIndex].Size;
+								e.SetMaxCount();
 
 								if (OnReceived(connection, ref e) == false)
 									return false;
@@ -221,6 +223,7 @@ namespace SocketServers
 								e2.ArraySegment = buffer;
 								e2.Offset = message.Buffers[dataIndex].Offset;
 								e2.BytesTransferred = message.Buffers[dataIndex].Size;
+								e2.SetMaxCount();
 
 								bool continue1 = OnReceived(connection, ref e2);
 
@@ -366,6 +369,7 @@ namespace SocketServers
 						{
 							oe.Count = output.Buffers[0].Size;
 							oe.CopyAddressesFrom(ie);
+							oe.LocalEndPoint = GetLocalEndpoint(ie.RemoteEndPoint.Address);
 
 							base.SendAsync(oe);
 							oe = null;

@@ -58,7 +58,7 @@ namespace EchoClient
 				MultiConnection(server1, 1, 1024);
 				MultiConnection(server1, 4096, 1);
 				MultiConnection(server1, 512, 16);
-			//	Thread.Sleep(250000);
+				//	Thread.Sleep(250000);
 			}
 			EchoTls(new IPEndPoint(server1.Address, server1.Port + 1), 64);
 			EchoTlsSpliter(new IPEndPoint(server1.Address, server1.Port + 1));
@@ -210,7 +210,7 @@ namespace EchoClient
 			{
 				sockets[i] = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 				sockets[i].Bind(new IPEndPoint((server.AddressFamily == AddressFamily.InterNetwork) ? IPAddress.Any : IPAddress.IPv6Any, 0));
-				sockets[i].ReceiveTimeout = 5000; 
+				sockets[i].ReceiveTimeout = 5000;
 				sockets[i].Connect(server);
 			}
 

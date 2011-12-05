@@ -329,11 +329,16 @@ namespace SocketServers
 #if DEBUG
 				if (value < 0)
 					throw new ArgumentOutOfRangeException(@"Count can not be negative number");
-				if (value < offsetOffset)
-					throw new ArgumentOutOfRangeException(@"Count can not be less than OffsetOffset");
+				//if (value < offsetOffset)
+				//    throw new ArgumentOutOfRangeException(@"Count can not be less than OffsetOffset");
 #endif
 				count = value;
 			}
+		}
+
+		public void SetMaxCount()
+		{
+			count = segment.Count - offsetOffset;
 		}
 
 		public int BytesTransferred
