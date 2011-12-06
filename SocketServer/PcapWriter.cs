@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Copyright (C) 2010 OfficeSIP Communications
+// This source is subject to the GNU General Public License.
+// Please see Notice.txt for details.
+
+using System;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -65,6 +69,11 @@ namespace Pcap
 		public void Dispose()
 		{
 			stream.Dispose();
+		}
+
+		public void Flush()
+		{
+			stream.Flush();
 		}
 
 		public void WriteComment(string comment)

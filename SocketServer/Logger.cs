@@ -1,4 +1,8 @@
-﻿using System;
+﻿// Copyright (C) 2010 OfficeSIP Communications
+// This source is subject to the GNU General Public License.
+// Please see Notice.txt for details.
+
+using System;
 using System.IO;
 using System.Threading;
 using Pcap;
@@ -29,12 +33,17 @@ namespace SocketServers
 
 		public void Enable(string filename)
 		{
+			Enable(File.Create(filename));
+		}
+
+		public void Enable(Stream stream)
+		{
 			lock (sync)
 			{
 				if (IsEnabled)
 					Disable();
 
-				writer = new PcapWriter(File.Create(filename));
+				writer = new PcapWriter(stream);
 
 				IsEnabled = true;
 			}
@@ -57,6 +66,28 @@ namespace SocketServers
 		{
 			get;
 			private set;
+		}
+
+		public void Flush()
+		{
+			lock (sync)
+			{
+				if (writer != null)
+					writer.Flush();
+			}
+		}
+
+		public void WriteComment(string comment)
+		{
+			try
+			{
+				var localWriter = writer;
+				if (localWriter != null)
+					localWriter.WriteComment(comment);
+			}
+			catch (ObjectDisposedException)
+			{
+			}
 		}
 
 		internal void Write(ServerAsyncEventArgs e, bool incomingOutgoing)
