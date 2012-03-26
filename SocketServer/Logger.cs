@@ -70,10 +70,14 @@ namespace SocketServers
 
 		public void Flush()
 		{
-			lock (sync)
+			try
 			{
-				if (writer != null)
-					writer.Flush();
+				var localWriter = writer;
+				if (localWriter != null)
+					localWriter.Flush();
+			}
+			catch (ObjectDisposedException)
+			{
 			}
 		}
 
