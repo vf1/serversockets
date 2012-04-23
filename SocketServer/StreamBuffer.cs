@@ -28,7 +28,7 @@ namespace SocketServers
 			private set;
 		}
 
-		public void MoveCount(int offset)
+		public void AddCount(int offset)
 		{
 			Count += offset;
 		}

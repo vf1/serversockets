@@ -11,7 +11,7 @@ namespace SocketServers
 {
 	abstract partial class Server<C>
 		: IDisposable
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		protected volatile bool isRunning;
 		protected ServerEndPoint realEndPoint;
@@ -26,6 +26,7 @@ namespace SocketServers
 		public ServerEventHandlerVal<Server<C>, ServerInfoEventArgs> Failed;
 		public ServerEventHandlerRef<Server<C>, C, ServerAsyncEventArgs, bool> Received;
 		public ServerEventHandlerVal<Server<C>, ServerAsyncEventArgs> Sent;
+		public ServerEventHandlerVal<Server<C>, C, ServerAsyncEventArgs> BeforeSend;
 		public ServerEventHandlerVal<Server<C>, C> NewConnection;
 		public ServerEventHandlerVal<Server<C>, C> EndConnection;
 
@@ -62,25 +63,24 @@ namespace SocketServers
 
 		protected virtual void OnNewConnection(Connection<C> connection)
 		{
-			if (NewConnection != null)
+			connection.UserConnection = new C()
 			{
-				connection.UserConnection = new C()
-				{
-					LocalEndPoint = GetLocalEndpoint(connection.RemoteEndPoint.Address),
-					RemoteEndPoint = connection.RemoteEndPoint,
-					Id = connection.Id,
-				};
+				LocalEndPoint = GetLocalEndpoint(connection.RemoteEndPoint.Address),
+				RemoteEndPoint = connection.RemoteEndPoint,
+				Id = connection.Id,
+			};
 
-				NewConnection(this, connection.UserConnection);
-			}
+			NewConnection(this, connection.UserConnection);
 		}
 
 		protected virtual void OnEndConnection(Connection<C> connection)
 		{
-			if (EndConnection != null)
-			{
-				EndConnection(this, connection.UserConnection);
-			}
+			EndConnection(this, connection.UserConnection);
+		}
+
+		protected void OnBeforeSend(Connection<C> connection, ServerAsyncEventArgs e)
+		{
+			BeforeSend(this, (connection == null) ? null : connection.UserConnection, e);
 		}
 
 		public static Server<C> Create(ServerEndPoint real, IPEndPoint ip4fake, IPAddress ip4mask, ServersManagerConfig config)

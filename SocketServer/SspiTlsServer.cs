@@ -16,7 +16,7 @@ namespace SocketServers
 {
 	class SspiTlsServer<C>
 		: BaseTcpServer<C>
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		// http://www.codeproject.com/KB/IP/sslclasses.aspx
 
@@ -59,6 +59,8 @@ namespace SocketServers
 			{
 				var connection = GetTcpConnection(e.RemoteEndPoint);
 
+				OnBeforeSend(connection, e);
+
 				if (connection == null)
 				{
 					e.Completed = Send_Completed;
@@ -99,7 +101,7 @@ namespace SocketServers
 				e.Count = message.Buffers[0].Size + message.Buffers[1].Size + message.Buffers[2].Size;
 				e.ReAllocateBuffer(true);
 
-				base.SendAsync(e);
+				base.SendAsync(connection, e);
 			}
 			catch (SspiException ex)
 			{
@@ -220,7 +222,8 @@ namespace SocketServers
 
 								base.PrepareEventArgs(connection, e2);
 
-								e2.ArraySegment = buffer;
+								//e2.BufferSegment = buffer;
+								e2.AttachBuffer(buffer);
 								e2.Offset = message.Buffers[dataIndex].Offset;
 								e2.BytesTransferred = message.Buffers[dataIndex].Size;
 								e2.SetMaxCount();
@@ -371,7 +374,7 @@ namespace SocketServers
 							oe.CopyAddressesFrom(ie);
 							oe.LocalEndPoint = GetLocalEndpoint(ie.RemoteEndPoint.Address);
 
-							base.SendAsync(oe);
+							base.SendAsync(connection, oe);
 							oe = null;
 						}
 					}

@@ -12,13 +12,13 @@ namespace SocketServers
 {
 	abstract class BaseTcpServer<C>
 		: Server<C>
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		private readonly object sync;
 		private Socket listener;
 		private ThreadSafeDictionary<EndPoint, Connection<C>> connections;
 		private readonly int receiveQueueSize;
-		private readonly int offsetOffset;
+		//private readonly int offsetOffset;
 		private bool socketReuseEnabled;
 		private readonly int maxAcceptBacklog;
 		private readonly int minAcceptBacklog;
@@ -30,7 +30,7 @@ namespace SocketServers
 			sync = new object();
 
 			receiveQueueSize = config.TcpQueueSize;
-			offsetOffset = config.TcpOffsetOffset;
+			//offsetOffset = config.TcpOffsetOffset;
 
 			minAcceptBacklog = config.TcpMinAcceptBacklog;
 			maxAcceptBacklog = config.TcpMaxAcceptBacklog;
@@ -100,10 +100,8 @@ namespace SocketServers
 		protected abstract void OnEndTcpConnection(Connection<C> connection);
 		protected abstract bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e);
 
-		public override void SendAsync(ServerAsyncEventArgs e)
+		protected void SendAsync(Connection<C> connection, ServerAsyncEventArgs e)
 		{
-			var connection = GetTcpConnection(e.RemoteEndPoint);
-
 			if (connection == null)
 			{
 				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId)
@@ -419,8 +417,8 @@ namespace SocketServers
 			e.ConnectionId = connection.Id;
 			e.RemoteEndPoint = connection.RemoteEndPoint;
 			e.Completed = Receive_Completed;
-			e.OffsetOffset = offsetOffset;
-			e.Count -= offsetOffset;
+			//e.OffsetOffset = offsetOffset;
+			//e.Count -= offsetOffset;
 		}
 
 		protected Connection<C> GetTcpConnection(IPEndPoint remote)

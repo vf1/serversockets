@@ -18,6 +18,9 @@ namespace SocketServers
 		public const int AnyNewConnectionId = -1;
 		public const int AnyConnectionId = -2;
 		public const int DefaultSize = 2048;
+		public const int DefaultOffsetOffset = 0;
+
+		internal int SequenceNumber;
 
 		private bool isPooled;
 
@@ -26,12 +29,6 @@ namespace SocketServers
 		private int bytesTransferred;
 		private ArraySegment<byte> segment;
 		private SocketAsyncEventArgs socketArgs;
-
-#if EVENTARGS_TRACING
-		private List<string> tracing = new List<string>();
-#endif
-
-		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
 
 		public ServerAsyncEventArgs()
 		{
@@ -84,34 +81,420 @@ namespace SocketServers
 			}
 		}
 
-		#region ILockFreePoolItem
-
-		bool ILockFreePoolItem.IsPooled
-		{
-			set { Trace(); isPooled = value; }
-		}
+		#region ILockFreePoolItem: SetDefaultValue / IsPooled
 
 		public void SetDefaultValue()
 		{
 			Trace();
 
 			ConnectionId = AnyNewConnectionId;
+			LocalEndPoint = null;
+
 			Completed = null;
 			AcceptSocket = null;
 
 			if (segment.Array != null && segment.Count != DefaultSize)
 				BufferManager.Free(ref segment);
 
-			count = DefaultSize;
-			offsetOffset = 0;
+			offsetOffset = DefaultOffsetOffset;
+			count = DefaultSize - DefaultOffsetOffset;
 			bytesTransferred = 0;
 
 			UserTokenForSending = 0;
 		}
 
+		bool ILockFreePoolItem.IsPooled
+		{
+			set { Trace(); isPooled = value; }
+		}
+
 		#endregion
 
+		#region UserTokenForSending
+
+		public int UserTokenForSending
+		{
+			get;
+			set;
+		}
+
+		#endregion
+
+		#region CreateDeepCopy
+
+		public ServerAsyncEventArgs CreateDeepCopy()
+		{
+			var e2 = EventArgsManager.Get();
+
+			e2.CopyAddressesFrom(this);
+
+			e2.offsetOffset = offsetOffset;
+			e2.count = count;
+			e2.AllocateBuffer();
+
+			e2.bytesTransferred = bytesTransferred;
+			e2.UserTokenForSending = UserTokenForSending;
+
+			System.Buffer.BlockCopy(Buffer, Offset, e2.Buffer, e2.Offset, e2.Count);
+
+			return e2;
+		}
+
+		#endregion
+
+		#region AcceptSocket / SocketError / DisconnectReuseSocket / ServerAsyncEventArgs -> SocketAsyncEventArgs
+
+		internal Socket AcceptSocket
+		{
+			get { Trace(); return socketArgs.AcceptSocket; }
+			set { Trace(); socketArgs.AcceptSocket = value; }
+		}
+
+		public SocketError SocketError
+		{
+			get { Trace(); return socketArgs.SocketError; }
+			internal set { Trace(); socketArgs.SocketError = value; }
+		}
+
+		public bool DisconnectReuseSocket
+		{
+			get { Trace(); return socketArgs.DisconnectReuseSocket; }
+			set { Trace(); socketArgs.DisconnectReuseSocket = value; }
+		}
+
+		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
+		{
+			if (serverArgs.Count > 0)
+			{
+				serverArgs.AllocateBuffer();
+				serverArgs.ValidateBufferSettings();
+				serverArgs.socketArgs.SetBuffer(serverArgs.Buffer, serverArgs.Offset, serverArgs.Count);
+			}
+			else
+			{
+				serverArgs.socketArgs.SetBuffer(null, -1, -1);
+			}
+
+
+			return serverArgs.socketArgs;
+		}
+
+		#endregion
+
+		#region RemoteEndPoint / LocalEndPoint / ConnectionId
+
+		public IPEndPoint RemoteEndPoint
+		{
+			get
+			{
+				Trace();
+				return socketArgs.RemoteEndPoint as IPEndPoint;
+			}
+			set
+			{
+				Trace();
+				if ((socketArgs.RemoteEndPoint as IPEndPoint).Equals(value) == false)
+				{
+					(socketArgs.RemoteEndPoint as IPEndPoint).Address = new IPAddress(value.Address.GetAddressBytes());
+					(socketArgs.RemoteEndPoint as IPEndPoint).Port = value.Port;
+				}
+			}
+		}
+
+		public ServerEndPoint LocalEndPoint
+		{
+			get;
+			set;
+		}
+
+		public int ConnectionId
+		{
+			get;
+			set;
+		}
+
+		public void CopyAddressesFrom(ServerAsyncEventArgs e)
+		{
+			ConnectionId = e.ConnectionId;
+			LocalEndPoint = e.LocalEndPoint;
+			RemoteEndPoint = e.RemoteEndPoint;
+		}
+
+		public void CopyAddressesFrom(BaseConnection c)
+		{
+			ConnectionId = c.Id;
+			LocalEndPoint = c.LocalEndPoint;
+			RemoteEndPoint = c.RemoteEndPoint;
+		}
+
+		public void SetAnyRemote(AddressFamily family)
+		{
+			Trace();
+			if (family == AddressFamily.InterNetwork)
+				RemoteEndPoint.Address = IPAddress.Any;
+			else
+				RemoteEndPoint.Address = IPAddress.IPv6Any;
+
+			RemoteEndPoint.Port = 0;
+		}
+
+		#endregion
+
+		#region OffsetOffset / Offset / BytesTransferred / Buffer
+
+		public int OffsetOffset
+		{
+			get { Trace(); return offsetOffset; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"OffsetOffset can not be negative number");
+#endif
+				offsetOffset = value;
+			}
+		}
+
+		public int Offset
+		{
+			get { Trace(); return segment.Offset + offsetOffset; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (segment.IsInvalid())
+					throw new ArgumentOutOfRangeException(@"Call AllocateBuffer() before change Offset value");
+				if (Offset < segment.Offset)
+					throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
+#endif
+				offsetOffset = value - segment.Offset;
+			}
+		}
+
+		public int Count
+		{
+			get { Trace(); return count; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"Count can not be negative number");
+				//if (value < offsetOffset)
+				//    throw new ArgumentOutOfRangeException(@"Count can not be less than OffsetOffset");
+#endif
+				count = value;
+			}
+		}
+
+		public int BytesTransferred
+		{
+			get { Trace(); return bytesTransferred; }
+			set
+			{
+				Trace();
+#if DEBUG
+				if (value < 0)
+					throw new ArgumentOutOfRangeException(@"BytesTransferred can not be negative number");
+#endif
+				bytesTransferred = value;
+			}
+		}
+
+		public byte[] Buffer
+		{
+			get
+			{
+				Trace();
+
+				if (offsetOffset + count > segment.Count)
+					ReAllocateBuffer(false);
+
+				return segment.Array;
+			}
+		}
+
+		public void SetMaxCount()
+		{
+			count = segment.Count - offsetOffset;
+		}
+
+		public int MinimumRequredOffsetOffset
+		{
+			get
+			{
+				if (LocalEndPoint == null)
+					throw new ArgumentException("You MUST set LocalEndPoint before this action.");
+
+				return (LocalEndPoint.Protocol == ServerProtocol.Tls) ? 256 : 0;
+			}
+		}
+
+		#endregion
+
+		#region BufferSegment / TransferredData / IncomingData / OutgoingData
+
+		public ArraySegment<byte> BufferSegment
+		{
+			get { return segment; }
+		}
+
+		public ArraySegment<byte> TransferredData
+		{
+			get { return new ArraySegment<byte>(Buffer, Offset, BytesTransferred); }
+		}
+
+		public ArraySegment<byte> IncomingData
+		{
+			get { return TransferredData; }
+		}
+
+		public ArraySegment<byte> OutgoingData
+		{
+			get { return new ArraySegment<byte>(Buffer, Offset, Count); }
+		}
+
+		#endregion
+
+		#region AllocateBuffer / FreeBuffer / BlockCopyFrom
+
+		public void AllocateBuffer()
+		{
+			Trace();
+
+			ReAllocateBuffer(false);
+		}
+
+		public void AllocateBuffer(int applicationOffsetOffset, int count)
+		{
+			Trace();
+
+			OffsetOffset = MinimumRequredOffsetOffset + applicationOffsetOffset;
+			Count = count;
+
+			ReAllocateBuffer(false);
+		}
+
+		public void ReAllocateBuffer(bool keepData)
+		{
+			Trace();
+
+			if (offsetOffset + count > segment.Count)
+			{
+				var newSegment = BufferManager.Allocate(offsetOffset + count);
+
+				if (keepData && segment.IsValid())
+					System.Buffer.BlockCopy(segment.Array, segment.Offset, newSegment.Array, newSegment.Offset, segment.Count);
+
+				AttachBuffer(newSegment);
+			}
+		}
+
+		public void FreeBuffer()
+		{
+			Trace();
+
+			BufferManager.Free(ref segment);
+			Count = 0;
+		}
+
+		public void BlockCopyFrom(ArraySegment<byte> data)
+		{
+			if (data.Count > Count)
+				throw new ArgumentOutOfRangeException("BlockCopyFrom: data.Count > Count");
+
+			System.Buffer.BlockCopy(data.Array, data.Offset, Buffer, Offset, data.Count);
+		}
+
+		public void BlockCopyFrom(int offsetOffset, ArraySegment<byte> data)
+		{
+			if (data.Count > Count)
+				throw new ArgumentOutOfRangeException("BlockCopyFrom: data.Count > Count");
+
+			System.Buffer.BlockCopy(data.Array, data.Offset, Buffer, Offset + offsetOffset, data.Count);
+		}
+
+		#endregion
+
+		#region AttachBuffer / DetachBuffer
+
+		public void AttachBuffer(ArraySegment<byte> buffer)
+		{
+			BufferManager.Free(segment);
+			segment = buffer;
+		}
+
+		public void AttachBuffer(StreamBuffer buffer)
+		{
+			Trace();
+
+			OffsetOffset = 0;
+			BytesTransferred = buffer.BytesTransferred;
+
+			AttachBuffer(buffer.Detach());
+
+			Count = segment.Count;
+		}
+
+		public ArraySegment<byte> DetachBuffer()
+		{
+			var result = segment;
+			segment = new ArraySegment<byte>();
+
+			count = DefaultSize;
+			offsetOffset = 0;
+			bytesTransferred = 0;
+
+			return result;
+		}
+
+		#endregion
+
+		#region Completed
+
+		internal delegate void CompletedEventHandler(Socket socket, ServerAsyncEventArgs e);
+
+		internal CompletedEventHandler Completed;
+
+		internal void OnCompleted(Socket socket)
+		{
+			if (Completed != null)
+				Completed(socket, this);
+		}
+
+		private static void SocketArgs_Completed(object sender, SocketAsyncEventArgs e)
+		{
+			var serverArgs = e.UserToken as ServerAsyncEventArgs;
+
+			serverArgs.bytesTransferred = e.BytesTransferred;
+
+			serverArgs.Completed(sender as Socket, serverArgs);
+		}
+
+		#endregion
+
+		[Conditional("DEBUG")]
+		internal void ValidateBufferSettings()
+		{
+			if (Offset < segment.Offset)
+				throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
+
+			if (OffsetOffset >= segment.Count)
+				throw new ArgumentOutOfRangeException(@"OffsetOffset is bigger than segment.Count");
+
+			if (BytesTransferred >= segment.Count)
+				throw new ArgumentOutOfRangeException(@"BytesTransferred is bigger than segment.Count");
+
+			if (OffsetOffset + Count > segment.Count)
+				throw new ArgumentOutOfRangeException(@"Invalid buffer settings: OffsetOffset + Count is bigger than segment.Count");
+		}
+
 		#region Tracing
+
+#if EVENTARGS_TRACING
+		private List<string> tracing = new List<string>();
+#endif
 
 #if EVENTARGS_TRACING
 		~ServerAsyncEventArgs()
@@ -164,310 +547,6 @@ namespace SocketServers
 #else
 			return @"NO TRACING";
 #endif
-		}
-
-		#endregion
-
-		public ServerEndPoint LocalEndPoint
-		{
-			get;
-			set;
-		}
-
-		public int ConnectionId
-		{
-			get;
-			set;
-		}
-
-		internal int SequenceNumber;
-
-		public int UserTokenForSending
-		{
-			get;
-			set;
-		}
-
-		public void CopyAddressesFrom(ServerAsyncEventArgs e)
-		{
-			ConnectionId = e.ConnectionId;
-			LocalEndPoint = e.LocalEndPoint;
-			RemoteEndPoint = e.RemoteEndPoint;
-		}
-
-		public void CopyAddressesFrom(BaseConnection c)
-		{
-			ConnectionId = c.Id;
-			LocalEndPoint = c.LocalEndPoint;
-			RemoteEndPoint = c.RemoteEndPoint;
-		}
-
-		public ServerAsyncEventArgs DeepCopy()
-		{
-			var e2 = EventArgsManager.Get();
-
-			e2.CopyAddressesFrom(this);
-
-			e2.offsetOffset = offsetOffset;
-			e2.count = count;
-			e2.AllocateBuffer();
-
-			e2.bytesTransferred = bytesTransferred;
-			e2.UserTokenForSending = UserTokenForSending;
-
-			System.Buffer.BlockCopy(Buffer, Offset, e2.Buffer, e2.Offset, e2.Count);
-
-			return e2;
-		}
-
-		#region SocketAsyncEventArgs
-
-		public static implicit operator SocketAsyncEventArgs(ServerAsyncEventArgs serverArgs)
-		{
-			if (serverArgs.Count > 0)
-			{
-				serverArgs.AllocateBuffer();
-				serverArgs.ValidateBufferSettings();
-				serverArgs.socketArgs.SetBuffer(serverArgs.Buffer, serverArgs.Offset, serverArgs.Count);
-			}
-			else
-			{
-				serverArgs.socketArgs.SetBuffer(null, -1, -1);
-			}
-
-
-			return serverArgs.socketArgs;
-		}
-
-		internal Socket AcceptSocket
-		{
-			get { Trace(); return socketArgs.AcceptSocket; }
-			set { Trace(); socketArgs.AcceptSocket = value; }
-		}
-
-		public SocketError SocketError
-		{
-			get { Trace(); return socketArgs.SocketError; }
-			internal set { Trace(); socketArgs.SocketError = value; }
-		}
-
-		public IPEndPoint RemoteEndPoint
-		{
-			get
-			{
-				Trace();
-				return socketArgs.RemoteEndPoint as IPEndPoint;
-			}
-			set
-			{
-				Trace();
-				if ((socketArgs.RemoteEndPoint as IPEndPoint).Equals(value) == false)
-				{
-					(socketArgs.RemoteEndPoint as IPEndPoint).Address = new IPAddress(value.Address.GetAddressBytes());
-					(socketArgs.RemoteEndPoint as IPEndPoint).Port = value.Port;
-				}
-			}
-		}
-
-		public void SetAnyRemote(AddressFamily family)
-		{
-			Trace();
-			if (family == AddressFamily.InterNetwork)
-				RemoteEndPoint.Address = IPAddress.Any;
-			else
-				RemoteEndPoint.Address = IPAddress.IPv6Any;
-
-			RemoteEndPoint.Port = 0;
-		}
-
-		public bool DisconnectReuseSocket
-		{
-			get { Trace(); return socketArgs.DisconnectReuseSocket; }
-			set { Trace(); socketArgs.DisconnectReuseSocket = value; }
-		}
-
-		#endregion
-
-		#region Buffer relayted
-
-		public int OffsetOffset
-		{
-			get { Trace(); return offsetOffset; }
-			set
-			{
-				Trace();
-#if DEBUG
-				if (value < 0)
-					throw new ArgumentOutOfRangeException(@"OffsetOffset can not be negative number");
-#endif
-				offsetOffset = value;
-			}
-		}
-
-		public int Offset
-		{
-			get { Trace(); return segment.Offset + offsetOffset; }
-			set
-			{
-				Trace();
-#if DEBUG
-				if (segment.IsInvalid())
-					throw new ArgumentOutOfRangeException(@"Call AllocateBuffer() before change Offset value");
-				if (Offset < segment.Offset)
-					throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
-#endif
-				offsetOffset = value - segment.Offset;
-			}
-		}
-
-		public int Count
-		{
-			get { Trace(); return count; }
-			set
-			{
-				Trace();
-#if DEBUG
-				if (value < 0)
-					throw new ArgumentOutOfRangeException(@"Count can not be negative number");
-				//if (value < offsetOffset)
-				//    throw new ArgumentOutOfRangeException(@"Count can not be less than OffsetOffset");
-#endif
-				count = value;
-			}
-		}
-
-		public void SetMaxCount()
-		{
-			count = segment.Count - offsetOffset;
-		}
-
-		public int BytesTransferred
-		{
-			get { Trace(); return bytesTransferred; }
-			set
-			{
-				Trace();
-#if DEBUG
-				if (value < 0)
-					throw new ArgumentOutOfRangeException(@"BytesTransferred can not be negative number");
-#endif
-				bytesTransferred = value;
-			}
-		}
-
-		public ArraySegment<byte> ArraySegment
-		{
-			get { return segment; }
-			set
-			{
-				BufferManager.Free(segment);
-				segment = value;
-			}
-		}
-
-		public byte[] Buffer
-		{
-			get
-			{
-				Trace();
-
-				if (offsetOffset + count > segment.Count)
-					ReAllocateBuffer(false);
-
-				return segment.Array;
-			}
-		}
-
-		public void AllocateBuffer()
-		{
-			Trace();
-
-			ReAllocateBuffer(false);
-		}
-
-		public void ReAllocateBuffer(bool keepData)
-		{
-			Trace();
-
-			if (offsetOffset + count > segment.Count)
-			{
-				var newSegment = BufferManager.Allocate(offsetOffset + count);
-
-				if (keepData && segment.IsValid())
-					System.Buffer.BlockCopy(segment.Array, segment.Offset, newSegment.Array, newSegment.Offset, segment.Count);
-
-				ArraySegment = newSegment;
-			}
-		}
-
-		public void FreeBuffer()
-		{
-			Trace();
-
-			BufferManager.Free(ref segment);
-			Count = 0;
-		}
-
-
-		[Conditional("DEBUG")]
-		internal void ValidateBufferSettings()
-		{
-			if (Offset < segment.Offset)
-				throw new ArgumentOutOfRangeException(@"Offset is below than segment.Offset value");
-
-			if (OffsetOffset >= segment.Count)
-				throw new ArgumentOutOfRangeException(@"OffsetOffset is bigger than segment.Count");
-
-			if (BytesTransferred >= segment.Count)
-				throw new ArgumentOutOfRangeException(@"BytesTransferred is bigger than segment.Count");
-
-			if (OffsetOffset + Count > segment.Count)
-				throw new ArgumentOutOfRangeException(@"Invalid buffer settings: OffsetOffset + Count is bigger than segment.Count");
-		}
-
-		public void AttachBuffer(StreamBuffer buffer)
-		{
-			Trace();
-
-			OffsetOffset = 0;
-			BytesTransferred = buffer.BytesTransferred;
-
-			ArraySegment = buffer.Detach();
-
-			Count = segment.Count;
-		}
-
-		public ArraySegment<byte> DetachBuffer()
-		{
-			var result = segment;
-			segment = new ArraySegment<byte>();
-
-			count = DefaultSize;
-			offsetOffset = 0;
-			bytesTransferred = 0;
-
-			return result;
-		}
-
-		#endregion
-
-		#region Completed
-
-		internal CompletedEventHandler Completed;
-
-		internal void OnCompleted(Socket socket)
-		{
-			if (Completed != null)
-				Completed(socket, this);
-		}
-
-		private static void SocketArgs_Completed(object sender, SocketAsyncEventArgs e)
-		{
-			var serverArgs = e.UserToken as ServerAsyncEventArgs;
-
-			serverArgs.bytesTransferred = e.BytesTransferred;
-
-			serverArgs.Completed(sender as Socket, serverArgs);
 		}
 
 		#endregion

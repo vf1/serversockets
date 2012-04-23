@@ -16,10 +16,10 @@ namespace SocketServers
 				(int)(BufferManager.MaxMemoryUsage / ServerAsyncEventArgs.DefaultSize));
 		}
 
-		internal static void Initialize(int size)
-		{
-			pool = new LockFreePool<ServerAsyncEventArgs>(size);
-		}
+		//internal static void Initialize(int size)
+		//{
+		//    pool = new LockFreePool<ServerAsyncEventArgs>(size);
+		//}
 
 		internal static bool IsInitialized()
 		{
@@ -45,9 +45,19 @@ namespace SocketServers
 			pool.Put(value);
 		}
 
-		internal static ILockFreePool<ServerAsyncEventArgs> Pool
+		public static int Queued
 		{
-			get { return pool; }
+			get { return pool.Queued; }
 		}
+
+		public static int Created
+		{
+			get { return pool.Created; }
+		}
+
+		//internal static ILockFreePool<ServerAsyncEventArgs> Pool
+		//{
+		//    get { return pool; }
+		//}
 	}
 }

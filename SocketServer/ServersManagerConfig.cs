@@ -21,7 +21,7 @@ namespace SocketServers
 		public int UdpQueueSize;
 		public int TcpMinAcceptBacklog;
 		public int TcpMaxAcceptBacklog;
-		public int TcpOffsetOffset;
+		//public int TcpOffsetOffset;
 		public int TcpQueueSize;
 		public X509Certificate2 TlsCertificate;
 	}

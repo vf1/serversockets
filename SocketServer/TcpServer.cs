@@ -12,7 +12,7 @@ namespace SocketServers
 {
 	class TcpServer<C>
 		: BaseTcpServer<C>
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		public TcpServer(ServersManagerConfig config)
 			: base(config)
@@ -32,6 +32,15 @@ namespace SocketServers
 		protected override bool OnTcpReceived(Connection<C> connection, ref ServerAsyncEventArgs e)
 		{
 			return OnReceived(connection, ref e);
+		}
+
+		public override void SendAsync(ServerAsyncEventArgs e)
+		{
+			var connection = GetTcpConnection(e.RemoteEndPoint);
+
+			OnBeforeSend(connection, e);
+
+			base.SendAsync(connection, e);
 		}
 	}
 }

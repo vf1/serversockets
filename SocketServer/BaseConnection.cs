@@ -8,7 +8,6 @@ using System.Net;
 namespace SocketServers
 {
 	public class BaseConnection
-		: IDisposable
 	{
 		public BaseConnection()
 		{

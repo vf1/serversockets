@@ -10,7 +10,7 @@ using System.Threading;
 namespace SocketServers
 {
 	partial class Server<C>
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		internal class Connection<C2>
 			: IDisposable

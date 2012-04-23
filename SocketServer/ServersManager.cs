@@ -14,7 +14,7 @@ namespace SocketServers
 {
 	public partial class ServersManager<C>
 		: IDisposable
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		private object sync;
 		private bool running;
@@ -58,6 +58,7 @@ namespace SocketServers
 		public event ServerEventHandlerRef<ServersManager<C>, ServerAsyncEventArgs> Sent;
 		public event ServerEventHandlerVal<ServersManager<C>, C> NewConnection;
 		public event ServerEventHandlerVal<ServersManager<C>, C> EndConnection;
+		public event ServerEventHandlerVal<ServersManager<C>, C, ServerAsyncEventArgs> BeforeSend;
 
 		private static bool DefaultAddressPredicate(NetworkInterface interface1, IPInterfaceProperties properties, UnicastIPAddressInformation addrInfo)
 		{
@@ -106,10 +107,10 @@ namespace SocketServers
 			set;
 		}
 
-		public ILockFreePool<ServerAsyncEventArgs> BuffersPool
-		{
-			get { return EventArgsManager.Pool; }
-		}
+		//public ILockFreePool<ServerAsyncEventArgs> BuffersPool
+		//{
+		//    get { return EventArgsManager.Pool; }
+		//}
 
 		public SocketError Bind(ProtocolPort pp)
 		{
@@ -299,6 +300,7 @@ namespace SocketServers
 					server.Failed = Server_Failed;
 					server.NewConnection = Server_NewConnection;
 					server.EndConnection = Server_EndConnection;
+					server.BeforeSend = Server_BeforeSend;
 
 					try
 					{
@@ -395,16 +397,29 @@ namespace SocketServers
 			}
 		}
 
-		private void Server_EndConnection(Server<C> server, C e)
+		private void Server_EndConnection(Server<C> server, C c)
 		{
 			try
 			{
 				if (EndConnection != null)
-					EndConnection(this, e);
+					EndConnection(this, c);
 			}
 			catch (Exception ex)
 			{
 				throw new Exception(@"Error in EndConnection event handler", ex);
+			}
+		}
+
+		private void Server_BeforeSend(Server<C> server, C c, ServerAsyncEventArgs e)
+		{
+			try
+			{
+				if (BeforeSend != null)
+					BeforeSend(this, c, e);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception(@"Error in BeforeSend event handler", ex);
 			}
 		}
 

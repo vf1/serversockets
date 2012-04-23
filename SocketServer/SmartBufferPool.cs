@@ -101,8 +101,11 @@ namespace SocketServers
 		public void Free(ArraySegment<byte> segment)
 		{
 			int bufferIndex = 0;
-			while (buffers[bufferIndex] != segment.Array)
+			while (bufferIndex < buffers.Length && buffers[bufferIndex] != segment.Array)
 				bufferIndex++;
+
+			if (bufferIndex >= buffers.Length)
+				throw new ArgumentException("SmartBufferPool.Free, segment.Array is invalid");
 
 			int index = empty.Pop();
 			array[index].Value = ((long)bufferIndex << 32) + segment.Offset;
@@ -144,8 +147,8 @@ namespace SocketServers
 		private static byte[] NewBuffer(long size)
 		{
 			var buffer = new byte[size];
-		//	for (int i = 0; i < size; i += 1024)
-		//		buffer[i] = 0;
+			//	for (int i = 0; i < size; i += 1024)
+			//		buffer[i] = 0;
 
 			return buffer;
 		}

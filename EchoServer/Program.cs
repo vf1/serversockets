@@ -13,6 +13,11 @@ namespace EchoServer
 {
 	class Program
 	{
+		class BaseConnection2 : BaseConnection, IDisposable
+		{
+			void IDisposable.Dispose() { }
+		}
+
 		static void Main(string[] args)
 		{
 			int serverPort = 5070;
@@ -43,7 +48,7 @@ namespace EchoServer
 
 			int port = 6000;
 			IPAddress address = IPAddress.Parse(@"200.200.200.200");
-			var serversManager = new ServersManager<BaseConnection>(new ServersManagerConfig() { TcpOffsetOffset = 256, TlsCertificate = certificate, });
+			var serversManager = new ServersManager<BaseConnection2>(new ServersManagerConfig() { /*TcpOffsetOffset = 256, */TlsCertificate = certificate, });
 			serversManager.FakeAddressAction =
 				(ServerEndPoint real1) =>
 				{
@@ -102,8 +107,8 @@ namespace EchoServer
 			/////////////////////////////////////////////////////////////////////////
 
 			Console.WriteLine(@"Stats:");
-			Console.WriteLine(@"  Buffers Created : {0}", serversManager.BuffersPool.Created);
-			Console.WriteLine(@"  Buffers Queued  : {0}", serversManager.BuffersPool.Queued);
+			Console.WriteLine(@"  Buffers Created : {0}", EventArgsManager.Created);
+			Console.WriteLine(@"  Buffers Queued  : {0}", EventArgsManager.Queued);
 
 			/////////////////////////////////////////////////////////////////////////
 
@@ -134,27 +139,27 @@ namespace EchoServer
 
 			for (int i = 0; i < 240; i++)
 			{
-				if (serversManager.BuffersPool.Created == serversManager.BuffersPool.Queued)
+				if (EventArgsManager.Created == EventArgsManager.Queued)
 					break;
 				Console.Write("\rWaiting for buffers: {0} seconds", i / 2);
 				Thread.Sleep(500);
 			}
 			Console.WriteLine();
 
-			if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
+			if (EventArgsManager.Created != EventArgsManager.Queued)
 			{
 				Console.WriteLine(@"Lost buffers:");
-				Console.WriteLine(@"  Buffers Created : {0}", serversManager.BuffersPool.Created);
-				Console.WriteLine(@"  Buffers Queued  : {0}", serversManager.BuffersPool.Queued);
+				Console.WriteLine(@"  Buffers Created : {0}", EventArgsManager.Created);
+				Console.WriteLine(@"  Buffers Queued  : {0}", EventArgsManager.Queued);
 
 				Console.WriteLine("  GC for gen #0 {0}, #1 {1}, #2 {2}", GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
 				Console.Write(@"  Trying to garbage lost buffers...");
 				GC.Collect();
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
-				if (serversManager.BuffersPool.Created != serversManager.BuffersPool.Queued)
+				if (EventArgsManager.Created != EventArgsManager.Queued)
 				{
-					Console.WriteLine("Failed {0}", serversManager.BuffersPool.Created - serversManager.BuffersPool.Queued);
+					Console.WriteLine("Failed {0}", EventArgsManager.Created - EventArgsManager.Queued);
 					Console.WriteLine("  GC for gen #0 {0}, #1 {1}, #2 {2}", GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
 				}
 				else
@@ -163,16 +168,16 @@ namespace EchoServer
 			}
 		}
 
-		static void CreateSomeGarbage(ServersManager<BaseConnection> serversManager)
+		static void CreateSomeGarbage(ServersManager<BaseConnection2> serversManager)
 		{
-			serversManager.BuffersPool.Get();
-			serversManager.BuffersPool.Get();
-			serversManager.BuffersPool.Get();
-			serversManager.BuffersPool.Get();
-			serversManager.BuffersPool.Get();
+			EventArgsManager.Get();
+			EventArgsManager.Get();
+			EventArgsManager.Get();
+			EventArgsManager.Get();
+			EventArgsManager.Get();
 		}
 
-		static bool ServersManager_Received(ServersManager<BaseConnection> server, BaseConnection c, ref ServerAsyncEventArgs e)
+		static bool ServersManager_Received(ServersManager<BaseConnection2> server, BaseConnection c, ref ServerAsyncEventArgs e)
 		{
 			e.Count = e.BytesTransferred;
 			server.SendAsync(e);
@@ -181,7 +186,7 @@ namespace EchoServer
 			return true;
 		}
 
-		static void ServersManager_Sent(ServersManager<BaseConnection> server, ref ServerAsyncEventArgs e)
+		static void ServersManager_Sent(ServersManager<BaseConnection2> server, ref ServerAsyncEventArgs e)
 		{
 			if (e.SocketError != SocketError.Success)
 				Console.WriteLine("Sent error: {0}", e.SocketError.ToString());
@@ -205,12 +210,12 @@ namespace EchoServer
 		private static int openedConnections;
 		private static int closedConnections;
 
-		static void ServersManager_NewConnection(ServersManager<BaseConnection> s, BaseConnection e)
+		static void ServersManager_NewConnection(ServersManager<BaseConnection2> s, BaseConnection e)
 		{
 			Interlocked.Increment(ref openedConnections);
 		}
 
-		static void ServersManager_EndConnection(ServersManager<BaseConnection> s, BaseConnection e)
+		static void ServersManager_EndConnection(ServersManager<BaseConnection2> s, BaseConnection e)
 		{
 			Interlocked.Increment(ref closedConnections);
 		}

@@ -100,6 +100,9 @@ namespace Pcap
 			if (source.AddressFamily != destination.AddressFamily)
 				throw new ArgumentException("source.AddressFamily != destination.AddressFamily");
 
+			if (length > MaxRecordLength - 256)
+				length = MaxRecordLength - 256;
+
 			int tcpUdpLength = (protocol == Protocol.Udp) ? UdpLength :
 				(TcpLength + ((protocol == Protocol.Tls) ? TlsLength : 0));
 

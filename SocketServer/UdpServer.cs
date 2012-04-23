@@ -11,7 +11,7 @@ namespace SocketServers
 {
 	class UdpServer<C>
 		: Server<C>
-		where C : BaseConnection, new()
+		where C : BaseConnection, IDisposable, new()
 	{
 		private const int SIO_UDP_CONNRESET = -1744830452; // 0x9800000C
 
@@ -59,6 +59,8 @@ namespace SocketServers
 
 		public override void SendAsync(ServerAsyncEventArgs e)
 		{
+			OnBeforeSend(null, e);
+
 			e.Completed = Send_Completed;
 			if (socket.SendToAsync(e) == false)
 				e.OnCompleted(socket);
