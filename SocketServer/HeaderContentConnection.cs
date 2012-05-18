@@ -112,7 +112,7 @@ namespace SocketServers
 			readerStorage = Storage.None;
 			contentStorage = Storage.None;
 
-			ResetParser();
+			ResetParser(ResetReason.ResetStateCalled);
 
 			if (buffer1 != null)
 			{
@@ -177,7 +177,7 @@ namespace SocketServers
 								{
 									bytesProccessed += data.Count;
 
-									ResetParser();
+									ResetParser(ResetReason.NotEnoughData);
 
 									Buffer1.Resize(MaximumHeadersSize);
 									Buffer1.CopyTransferredFrom(e, oldBytesProccessed);
@@ -279,7 +279,7 @@ namespace SocketServers
 						{
 							case ParseCode.NotEnoughData:
 								{
-									ResetParser();
+									ResetParser(ResetReason.NotEnoughData);
 
 									if (data.Count < Buffer1.Capacity)
 									{
@@ -529,7 +529,13 @@ namespace SocketServers
 			}
 		}
 
-		protected abstract void ResetParser();
+		protected enum ResetReason
+		{
+			NotEnoughData,
+			ResetStateCalled,
+		}
+
+		protected abstract void ResetParser(ResetReason reason);
 		protected abstract void MessageReady();
 		protected abstract ParseResult Parse(ArraySegment<byte> data);
 		protected abstract void PreProcessRaw(ArraySegment<byte> data);

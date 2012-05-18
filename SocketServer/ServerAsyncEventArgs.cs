@@ -118,6 +118,12 @@ namespace SocketServers
 			set;
 		}
 
+		public int UserTokenForSending2
+		{
+			get;
+			set;
+		}
+
 		#endregion
 
 		#region CreateDeepCopy
