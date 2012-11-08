@@ -106,12 +106,21 @@ namespace SocketServers
 			{
 				if (e.ConnectionId == ServerAsyncEventArgs.AnyNewConnectionId)
 				{
-					Socket socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+					try
+					{
+						Socket socket = new Socket(realEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
-					socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
-					socket.Bind(realEndPoint);
+						socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
+						socket.Bind(realEndPoint);
 
-					socket.ConnectAsync(e, Connect_Completed);
+						socket.ConnectAsync(e, Connect_Completed);
+					}
+					catch (SocketException ex)
+					{
+						e.Completed = Send_Completed;
+						e.SocketError = ex.SocketErrorCode;
+						e.OnCompleted(null);
+					}
 				}
 				else
 				{
