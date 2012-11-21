@@ -18,7 +18,7 @@ namespace SocketServers
 		public const int AnyNewConnectionId = -1;
 		public const int AnyConnectionId = -2;
 		public const int DefaultSize = 2048;
-		public const int DefaultOffsetOffset = 0;
+		public static int DefaultOffsetOffset = 0;
 
 		internal int SequenceNumber;
 
