@@ -18,6 +18,13 @@ namespace SocketServers
 			Exception = error;
 		}
 
+		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, SocketException error)
+			: base(serverEndPoint)
+		{
+			SocketError = error.SocketErrorCode;
+			Exception = error;
+		}
+
 		internal ServerInfoEventArgs(ServerEndPoint serverEndPoint, string error)
 			: base(serverEndPoint)
 		{

@@ -80,7 +80,7 @@ namespace EchoServer
 
 			try
 			{
-				serversManager.Start();
+				serversManager.Start(true);
 				Console.WriteLine(@"Started!");
 			}
 			catch (Exception ex)

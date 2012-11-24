@@ -70,7 +70,7 @@ namespace SocketServers
 			return null;
 		}
 
-		public void Start()
+		public SocketError Start(bool ignoreErrros)
 		{
 			lock (sync)
 			{
@@ -78,7 +78,7 @@ namespace SocketServers
 
 				NetworkChange.NetworkAddressChanged += NetworkChange_NetworkAddressChanged;
 
-				AddServers(GetEndpointInfos(protocolPorts), false);
+				return AddServers(GetEndpointInfos(protocolPorts), ignoreErrros);
 			}
 		}
 
@@ -306,16 +306,13 @@ namespace SocketServers
 					{
 						server.Start();
 					}
-					catch (Exception ex)
+					catch (SocketException ex)
 					{
 						if (ignoreErrors)
 							OnServerInfo(new ServerInfoEventArgs(info.ServerEndPoint, ex));
 						else
 						{
-							if (ex is SocketException)
-								error = (ex as SocketException).SocketErrorCode;
-							else
-								throw;
+							error = ex.SocketErrorCode;
 							break;
 						}
 					}
