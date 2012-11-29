@@ -99,13 +99,16 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <!--
   <Import Project="$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"/>
   <Import Project="$(MSBuildExtensionsPath)\ExtensionPack\MSBuild.ExtensionPack.tasks"/>
+  -->
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>
   -->
+  <!--
   <Target Name="AfterBuild" DependsOnTargets="BuildZip">
   </Target>
   <Target Name="BuildZip" Condition="'$(Configuration)' == 'Release'">
@@ -131,4 +134,5 @@
          ZipFileName="$(OutputPath)SocketServers.$(Major).$(Minor).zip"
          ZipLevel="9" />
   </Target>
+  -->
 </Project>
